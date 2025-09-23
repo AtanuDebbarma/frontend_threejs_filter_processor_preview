@@ -1,16 +1,12 @@
 // src/hooks/useMediaFilesWithOriginals.ts
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useState} from 'react';
+import type {MediaFile} from '../types/filterTypes';
 
 export type AspectType = 'square' | 'landscape' | 'vertical';
 
-export interface MediaItem {
-  url: string; // blob URL created from the File
-  isVideo: boolean;
-  width: number; // original intrinsic width
-  height: number; // original intrinsic height
-  aspectRatio: number; // width / height
+export interface MediaItem extends MediaFile {
+  aspectRatio: number;
   aspectType: AspectType;
-  file?: File;
 }
 
 function computeAspectType(w: number, h: number): AspectType {
@@ -20,18 +16,14 @@ function computeAspectType(w: number, h: number): AspectType {
 }
 
 /**
- * Returns an array of MediaItem for the files. Waits for image/video metadata.
+ * Normalizes incoming MediaFile[] (from RN) into MediaItem[].
+ * If width/height missing, tries to probe metadata in-browser.
  */
-export function useMediaFilesWithOriginals(files: File[]): MediaItem[] {
+export function useMediaFilesWithOriginals(files: MediaFile[]): MediaItem[] {
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
-  const createdUrlsRef = useRef<string[]>([]);
 
   useEffect(() => {
     let mounted = true;
-    // cleanup previously created URLs
-    createdUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
-    createdUrlsRef.current = [];
-
     if (!files || files.length === 0) {
       if (mounted) setMediaList([]);
       return () => {
@@ -41,99 +33,81 @@ export function useMediaFilesWithOriginals(files: File[]): MediaItem[] {
 
     const loaders = files.map(file => {
       return new Promise<MediaItem>(resolve => {
-        const url = URL.createObjectURL(file);
-        createdUrlsRef.current.push(url);
-        const isVideo = file.type.startsWith('video/');
+        const {url, isVideo, width, height} = file;
+
+        // If width/height already provided from RN → no need to probe
+        if (width && height) {
+          resolve({
+            ...file,
+            width,
+            height,
+            aspectRatio: width / height,
+            aspectType: computeAspectType(width, height),
+          });
+          return;
+        }
 
         if (isVideo) {
           const v = document.createElement('video');
           v.preload = 'metadata';
+          v.src = url;
           v.muted = true;
           v.playsInline = true;
-          v.src = url;
 
           const cleanup = () => {
             v.src = '';
-            v.removeAttribute('src');
             try {
-              v.load && v.load();
-            } catch (e) {
-              //ignore
+              v.remove();
+            } catch {
+              // ignore
             }
-            v.remove();
           };
 
-          const onMeta = () => {
+          v.onloadedmetadata = () => {
             const w = v.videoWidth || 1;
             const h = v.videoHeight || 1;
-            const item: MediaItem = {
-              url,
-              isVideo: true,
+            resolve({
+              ...file,
               width: w,
               height: h,
               aspectRatio: w / h,
               aspectType: computeAspectType(w, h),
-              file,
-            };
+            });
             cleanup();
-            resolve(item);
           };
-
-          const onErr = () => {
-            // fallback defaults
+          v.onerror = () => {
             resolve({
-              url,
-              isVideo: true,
+              ...file,
               width: 1,
               height: 1,
               aspectRatio: 1,
               aspectType: 'square',
-              file,
             });
             cleanup();
           };
-
-          v.addEventListener('loadedmetadata', onMeta, {once: true});
-          v.addEventListener('error', onErr, {once: true});
         } else {
           const img = new Image();
           img.crossOrigin = 'anonymous';
           img.src = url;
-          const cleanupImg = () => {
-            img.onload = null;
-            img.onerror = null;
-            try {
-              img.remove();
-            } catch (e) {
-              //ignore
-            }
-          };
+
           img.onload = () => {
-            // naturalWidth/naturalHeight reflect intrinsic pixels (but see EXIF note below)
             const w = img.naturalWidth || 1;
             const h = img.naturalHeight || 1;
-            const item: MediaItem = {
-              url,
-              isVideo: false,
+            resolve({
+              ...file,
               width: w,
               height: h,
               aspectRatio: w / h,
               aspectType: computeAspectType(w, h),
-              file,
-            };
-            cleanupImg();
-            resolve(item);
+            });
           };
           img.onerror = () => {
-            cleanupImg();
             resolve({
-              url,
-              isVideo: false,
+              ...file,
               width: 1,
               height: 1,
               aspectRatio: 1,
               aspectType: 'square',
-              file,
             });
           };
         }
@@ -146,9 +120,6 @@ export function useMediaFilesWithOriginals(files: File[]): MediaItem[] {
 
     return () => {
       mounted = false;
-      // revoke created URLs
-      createdUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
-      createdUrlsRef.current = [];
     };
   }, [files]);
 

@@ -56,3 +56,11 @@ export type FilterItem = {
   category: FilterCategory;
   params: FilterParams;
 };
+
+export type MediaFile = {
+  url: string; // absolute or relative path, file://, content://, data:, or https://
+  name: string; // best-effort filename
+  isVideo: boolean; // flag for renderer
+  width?: number;
+  height?: number;
+};

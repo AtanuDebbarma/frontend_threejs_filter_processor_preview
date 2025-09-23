@@ -6,11 +6,9 @@ import {useMediaFilesWithOriginals} from '../../hooks/useMediaFilesWithOriginals
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {faPlay, faPause} from '@fortawesome/free-solid-svg-icons';
 import ClipLoader from 'react-spinners/ClipLoader';
-import {RenderTexts} from './RenderTexts';
 
 const MediaComponent = ({post}: {post: boolean}): React.JSX.Element => {
   const activeFilter = appStore(state => state.activeFilter);
-  const activeButton = appStore(state => state.activeButton);
   const mediaFiles = appStore(state => state.mediaFiles);
   const isApplyingFilter = appStore(state => state.isApplyingFilter);
 
@@ -161,7 +159,6 @@ const MediaComponent = ({post}: {post: boolean}): React.JSX.Element => {
           <div
             dir="ltr"
             className={`relative h-full w-full ${getMediaClasses(aspectList.aspectType)}} overflow-hidden rounded-lg`}>
-            {activeButton === 'text' && <RenderTexts mediaIndex={0} />}
             <Canvas
               id={`canvas-${aspectList.aspectType}`}
               className="h-full w-full"
@@ -193,7 +190,6 @@ const MediaComponent = ({post}: {post: boolean}): React.JSX.Element => {
           <div
             dir="ltr"
             className={`relativeh-full w-full ${getMediaClasses(aspectList.aspectType)} overflow-hidden rounded-lg`}>
-            {activeButton === 'text' && <RenderTexts mediaIndex={0} />}
             <Canvas
               id={`canvas-${aspectList.aspectType}`}
               className="h-full w-full"
@@ -252,7 +248,6 @@ const MediaComponent = ({post}: {post: boolean}): React.JSX.Element => {
                     />
                   </button>
                 )}
-                {activeButton === 'text' && <RenderTexts mediaIndex={index} />}
                 <Canvas
                   id={`canvas-${index}`}
                   style={{width: '100%', height: '100%'}}
@@ -285,7 +280,6 @@ const MediaComponent = ({post}: {post: boolean}): React.JSX.Element => {
                 className={
                   'relative h-full w-full overflow-hidden rounded-lg object-cover'
                 }>
-                {activeButton === 'text' && <RenderTexts mediaIndex={index} />}
                 <Canvas
                   id={`canvas-${index}`}
                   style={{width: '100%', height: '100%'}}

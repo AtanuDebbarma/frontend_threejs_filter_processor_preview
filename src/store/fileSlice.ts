@@ -1,10 +1,11 @@
 import type {StateCreator} from 'zustand';
 import type {AppState} from './appStore';
+import type {MediaFile} from '../types/filterTypes';
 
 export type FileSliceType = {
-  mediaFiles: File[];
+  mediaFiles: MediaFile[];
   selectedMediaIndex: number;
-  setMediaFiles: (files: File[]) => void;
+  setMediaFiles: (files: MediaFile[]) => void;
   setSelectedMediaIndex: (index: number) => void;
   videoThumbnailButton?: string;
   setVideoThumbnailButton: (thumbnail: string | undefined) => void;
@@ -20,7 +21,7 @@ export const createFileSlice: StateCreator<
   selectedMediaIndex: 0,
   videoThumbnailButton: undefined,
 
-  setMediaFiles: (files: File[]) =>
+  setMediaFiles: (files: MediaFile[]) =>
     set(state => {
       state.mediaFiles = files;
     }),
