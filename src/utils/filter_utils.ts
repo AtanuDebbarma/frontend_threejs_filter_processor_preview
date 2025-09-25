@@ -66,3 +66,93 @@ export const scheduleClearApplying = (
     }, remaining);
   }
 };
+
+/**
+ * Ensures that an image is fully loaded and ready to be used.
+ * Handles data:, blob:, and http(s) sources.
+ * @param {string} uri - The image URI to load.
+ * @returns {Promise<HTMLImageElement>} - A promise that resolves with the fully loaded image element.
+ */
+export async function ensureImageReady(uri: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    const cleanup = () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+
+    img.onload = () => {
+      cleanup();
+      console.log(
+        `✅ Image loaded: ${img.width}x${img.height}, src: ${uri.slice(0, 60)}...`,
+      );
+      resolve(img);
+    };
+
+    img.onerror = e => {
+      cleanup();
+      console.error(`❌ Image load failed for ${uri.slice(0, 60)}...`, e);
+      reject(e);
+    };
+
+    // Only set crossOrigin for non-data URIs
+    if (!uri.startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
+
+    img.src = uri;
+  });
+}
+
+/**
+ * Ensures that a video is fully loaded and ready to be used.
+ * Handles data:, blob:, and http(s) sources.
+ * @param {string} uri - The video URI to load.
+ * @returns {Promise<HTMLVideoElement>} - A promise that resolves with the fully loaded video element.
+ */
+export async function ensureVideoReady(uri: string): Promise<HTMLVideoElement> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+
+    video.autoplay = false;
+    video.muted = false;
+    video.playsInline = true;
+    video.preload = 'auto';
+
+    // Only set crossOrigin for non-data URIs
+    if (!uri.startsWith('data:')) {
+      video.crossOrigin = 'anonymous';
+    }
+
+    const cleanup = () => {
+      video.removeEventListener('canplaythrough', onReady);
+      video.removeEventListener('loadeddata', onReady);
+      video.removeEventListener('error', onError);
+    };
+
+    const onReady = () => {
+      cleanup();
+      console.log(
+        `✅ Video loaded: ${video.videoWidth}x${video.videoHeight}, src: ${uri.slice(
+          0,
+          60,
+        )}...`,
+      );
+      resolve(video);
+    };
+
+    const onError = (e: any) => {
+      cleanup();
+      console.error(`❌ Video load failed for ${uri.slice(0, 60)}...`, e);
+      reject(e);
+    };
+
+    // Listen to both events for robustness
+    video.addEventListener('canplaythrough', onReady, {once: true});
+    video.addEventListener('loadeddata', onReady, {once: true});
+    video.addEventListener('error', onError, {once: true});
+
+    video.src = uri;
+  });
+}
