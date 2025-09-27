@@ -183,6 +183,6 @@ export const fragmentShader = `
       c = linearToRec709(c);
     }
 
-    gl_FragColor = vec4(clamp(c, 0.0, 1.0), sampled.a);
+    gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
   }
 `;

@@ -36,17 +36,17 @@ export const createEditorSlice: StateCreator<
   [],
   EditorState
 > = set => ({
-  brightness: 0,
-  contrast: 1,
-  saturation: 1,
-  gamma: 1,
-  hue: 0,
+  brightness: 0.0,
+  contrast: 1.0,
+  saturation: 1.0,
+  gamma: 1.0,
+  hue: 0.0,
   colorBalance: {r: 0, g: 0, b: 0},
-  sharpness: 0,
-  shadows: 0,
-  highlights: 0,
-  temperature: 0,
-  blur: 0,
+  sharpness: 0.0,
+  shadows: 0.0,
+  highlights: 0.0,
+  temperature: 0.0,
+  blur: 0.0,
 
   setBrightness: value =>
     set(state => {

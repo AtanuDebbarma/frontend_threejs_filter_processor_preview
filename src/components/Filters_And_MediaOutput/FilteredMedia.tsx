@@ -53,25 +53,6 @@ export const FilteredMedia = React.memo((props: Props): React.JSX.Element => {
     gl.setPixelRatio(dpr);
   }, [gl]);
 
-  useEffect(() => {
-    if (!gl || !gl.domElement) return;
-
-    const onLost = (e: Event) => {
-      console.warn('❌ WebGL context lost', e);
-    };
-    const onRestored = () => {
-      console.info('✅ WebGL context restored');
-    };
-
-    gl.domElement.addEventListener('webglcontextlost', onLost);
-    gl.domElement.addEventListener('webglcontextrestored', onRestored);
-
-    return () => {
-      gl.domElement.removeEventListener('webglcontextlost', onLost);
-      gl.domElement.removeEventListener('webglcontextrestored', onRestored);
-    };
-  }, [gl]);
-
   // media texture state: start with placeholder -> real texture when ready
   const [mediaTextureState, setMediaTextureState] =
     useState<THREE.Texture | null>(null);
@@ -118,6 +99,8 @@ export const FilteredMedia = React.memo((props: Props): React.JSX.Element => {
   }, [props.uri, props.isVideo]);
 
   useEffect(() => {
+    if (!props.uri) return;
+    console.log('FilteredMedia: props.uri', props.uri);
     // image path: create texture immediately
     if (!props.isVideo) {
       // start "applying / loading" flag
@@ -152,6 +135,7 @@ export const FilteredMedia = React.memo((props: Props): React.JSX.Element => {
               } catch (e) {
                 // ignore
               }
+              // console.log('loadedTex', loadedTex);
               return loadedTex;
             });
           } finally {
@@ -192,6 +176,7 @@ export const FilteredMedia = React.memo((props: Props): React.JSX.Element => {
         } catch (e) {
           // ignore
         }
+        // console.log('tex', tex);
         return tex;
       });
 
@@ -240,6 +225,7 @@ export const FilteredMedia = React.memo((props: Props): React.JSX.Element => {
       } catch (e) {
         // ignore
       }
+      // console.log('placeholder', placeholder);
       return placeholder;
     });
 
@@ -300,6 +286,7 @@ export const FilteredMedia = React.memo((props: Props): React.JSX.Element => {
           } catch (e) {
             // ignore
           }
+          // console.log('vt', vt);
           return vt;
         });
 
@@ -378,7 +365,12 @@ export const FilteredMedia = React.memo((props: Props): React.JSX.Element => {
   // update VideoTexture each frame if present
   useFrame(() => {
     if (mediaTextureState instanceof THREE.VideoTexture) {
-      (mediaTextureState as THREE.VideoTexture).needsUpdate = true;
+      const videoElem = (mediaTextureState as any).__videoElement as
+        | HTMLVideoElement
+        | undefined;
+      if (videoElem && !videoElem.paused && !videoElem.ended) {
+        mediaTextureState.needsUpdate = true;
+      }
     }
   });
 

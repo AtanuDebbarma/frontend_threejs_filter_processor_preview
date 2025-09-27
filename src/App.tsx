@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useRef} from 'react';
 
 import {appStore} from './store/appStore';
 import {
@@ -8,18 +8,22 @@ import {
   type MediaFile,
 } from './types/filterTypes';
 import {MediaComponent} from './components/Filters_And_MediaOutput/MediaComponent';
-import VideoSRC from './assets/test.mp4';
-import VideoSRC2 from './assets/ufc.mp4';
+// import VideoSRC from './assets/test.mp4';
+// import VideoSRC2 from './assets/ufc.mp4';
+// import SRC2 from './assets/test.jpg';
 import {
   rnLogger,
   setupConsoleInterception,
   setupGlobalErrorHandling,
 } from './utils/rnLogger';
+import {hashObject} from './helpers/hashObjects';
 
-type IncomingPayload = {
+type HydrationPayload = {
   file: MediaFile[];
   post: boolean;
-  containerSize: {width: number; height: number} | null;
+  activeFilter: FilterItem | null;
+};
+type PatchPayload = {
   activeFilter: FilterItem | null;
   brightness: number;
   contrast: number;
@@ -36,11 +40,12 @@ type IncomingPayload = {
 
 const App = (): React.JSX.Element => {
   const activeFilter = appStore(state => state.activeFilter);
-  const mediaFiles = appStore(state => state.mediaFiles);
+  // const mediaFiles = appStore(state => state.mediaFiles);
   const setMediaFiles = appStore(state => state.setMediaFiles);
   const setActiveFilter = appStore(state => state.setActiveFilter);
   const resetEditorState = appStore(state => state.resetEditorState);
   const [post, setPost] = React.useState(true);
+  const lastHydrationHash = useRef<string | null>(null);
 
   // ✅ Setup logging and global error handling
   useEffect(() => {
@@ -56,70 +61,58 @@ const App = (): React.JSX.Element => {
   }, []);
 
   // ✅ Mock: simulate RN sending files in browser
-  useEffect(() => {
-    const mockMedia: MediaFile[] = [
-      {
-        id: '1',
-        uri: VideoSRC, // or import VideoSRC from './assets/test.mp4'
-        filename: 'sample',
-        mediaType: 'video',
-        width: 1080,
-        height: 1920,
-      },
-      {
-        id: '2',
-        uri: VideoSRC2,
-        filename: 'sample2',
-        mediaType: 'video',
-        width: 1080,
-        height: 1920,
-      },
-    ];
+  // useEffect(() => {
+  //   const mockMedia: MediaFile[] = [
+  //     {
+  //       id: '1',
+  //       uri: VideoSRC, // or import VideoSRC from './assets/test.mp4'
+  //       filename: 'sample',
+  //       mediaType: 'video',
+  //       width: 1080,
+  //       height: 1920,
+  //     },
+  //     {
+  //       id: '2',
+  //       uri: SRC2,
+  //       filename: 'sample2',
+  //       mediaType: 'photo',
+  //       width: 1080,
+  //       height: 1080,
+  //     },
+  //     {
+  //       id: '3',
+  //       uri: VideoSRC2,
+  //       filename: 'sample2',
+  //       mediaType: 'video',
+  //       width: 1080,
+  //       height: 1080,
+  //     },
+  //   ];
 
-    (window as any).__EXPO_MEDIA__ = {
-      file: mockMedia,
-      post: true,
-      activeFilter: null,
-      brightness: 0,
-      contrast: 1,
-      saturation: 1,
-      gamma: 1,
-      hue: 0,
-      colorBalance: {r: 0, g: 0, b: 0},
-      sharpness: 0,
-      shadows: 0,
-      highlights: 0,
-      temperature: 0,
-      blur: 0,
-    };
+  //   (window as any).__EXPO_MEDIA__ = {
+  //     file: mockMedia,
+  //     post: true,
+  //     activeFilter: defaultFilter,
+  //   };
 
-    // simulate RN dispatch
-    window.dispatchEvent(new Event('mediaReady'));
-  }, []);
+  //   // simulate RN dispatch
+  //   window.dispatchEvent(new Event('mediaReady'));
+  // }, []);
 
   useEffect(() => {
     const listener = () => {
-      const data: IncomingPayload = (window as any).__EXPO_MEDIA__;
-      console.log('📥 Received from RN:', data);
-      if (data) {
-        setMediaFiles(data.file || []);
-        setPost(data.post);
-        const filter = data.activeFilter || defaultFilter;
-        setActiveFilter(filter);
-        resetEditorState({
-          brightness: data.brightness || 1,
-          contrast: data.contrast || 1,
-          saturation: data.saturation || 1,
-          gamma: data.gamma || 1,
-          hue: data.hue || 0,
-          colorBalance: data.colorBalance || {r: 0, g: 0, b: 0},
-          sharpness: data.sharpness || 0,
-          shadows: data.shadows || 0,
-          highlights: data.highlights || 0,
-          temperature: data.temperature || 0,
-          blur: data.blur || 0,
-        });
-      }
+      const data: HydrationPayload = (window as any).__EXPO_MEDIA__;
+      if (!data) return;
+
+      const hash = hashObject(data);
+      lastHydrationHash.current = hash; // store injected payload hash
+
+      rnLogger.log('📥 Injected HYDRATE from RN:', data);
+
+      setMediaFiles(data.file ?? []);
+      setPost(data.post);
+      const filter = data.activeFilter ?? defaultFilter;
+      setActiveFilter(filter);
     };
 
     window.addEventListener('mediaReady', listener);
@@ -131,16 +124,63 @@ const App = (): React.JSX.Element => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ Always set the first filter
   useEffect(() => {
-    if (mediaFiles.length) {
-      setActiveFilter(defaultFilter);
-    }
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data);
+
+        if (msg.type === 'HYDRATE') {
+          const data: HydrationPayload = msg.payload;
+          const newHash = hashObject(data);
+
+          // 🚫 Skip if identical to last applied
+          if (lastHydrationHash.current === newHash) {
+            rnLogger.log('⏸ Ignoring redundant HYDRATE (same as injected)');
+            return;
+          }
+
+          rnLogger.log('📥 Applying HYDRATE from RN:', data);
+          lastHydrationHash.current = newHash;
+
+          setMediaFiles(data.file ?? []);
+          setPost(data.post);
+          const filter = data.activeFilter ?? defaultFilter;
+          setActiveFilter(filter);
+        }
+
+        if (msg.type === 'PATCH_STATE') {
+          rnLogger.log('🎨 PATCH_STATE update:', msg.payload);
+          const data: PatchPayload = msg.payload;
+          const filter = data.activeFilter ?? defaultFilter;
+          setActiveFilter(filter);
+          const p = defaultFilter.params;
+          resetEditorState({
+            brightness: data.brightness ?? p.brightness ?? 0.0,
+            contrast: data.contrast ?? p.contrast ?? 1.0,
+            saturation: data.saturation ?? p.saturation ?? 1.0,
+            gamma: data.gamma ?? p.gamma ?? 1.0,
+            hue: data.hue ?? p.hue ?? 0.0,
+            colorBalance: data.colorBalance ??
+              p.colorBalance ?? {r: 0, g: 0, b: 0},
+            sharpness: data.sharpness ?? p.unsharp?.amount ?? 0.0,
+            shadows: data.shadows ?? p.shadows ?? 0.0,
+            highlights: data.highlights ?? p.highlights ?? 0.0,
+            temperature: data.temperature ?? p.temperature ?? 0.0,
+            blur: data.blur ?? p.blur ?? 0.0,
+          });
+        }
+      } catch (err) {
+        rnLogger.error('⚠️ Bad message from RN:', event.data, err);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaFiles]);
+  }, []);
 
   useEffect(() => {
-    console.log('🎨 Active filter changed:', activeFilter);
+    rnLogger.log('🎨 Active filter changed:', activeFilter);
   }, [activeFilter]);
 
   return (

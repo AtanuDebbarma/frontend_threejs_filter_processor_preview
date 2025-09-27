@@ -12,12 +12,17 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import ClipLoader from 'react-spinners/ClipLoader';
 import {useActiveMediaIndex} from '../../hooks/useActiveMediaIndex';
+import {
+  useVerifiedMediaFiles,
+  type MediaItem,
+} from '../../hooks/useVerifiedMediaFiles';
 
 export const MediaCanvas = React.memo(
   ({post}: {post: boolean}): React.JSX.Element => {
     const activeFilter = appStore(state => state.activeFilter);
     const mediaFiles = appStore(state => state.mediaFiles);
     const isApplyingFilter = appStore(state => state.isApplyingFilter);
+
     const [aspectType, setAspectType] = useState<
       'square' | 'landscape' | 'vertical'
     >('vertical');
@@ -25,19 +30,16 @@ export const MediaCanvas = React.memo(
     // keep this memo so mapping identity is stable
     const Files = useMemo(() => mediaFiles.map(m => m), [mediaFiles]);
 
+    const mediaList: MediaItem[] = useVerifiedMediaFiles(Files);
+    const aspectList = useRef<MediaItem | null>(null);
+
     //  returns originals with aspect info
     useEffect(() => {
-      if (!Files.length || !Files[0].width || !Files[0].height) return;
-      const aspectType =
-        Files[0].width === Files[0].height
-          ? 'square'
-          : Files[0].width > Files[0].height
-            ? 'landscape'
-            : 'vertical';
-      setAspectType(aspectType);
-    }, [Files]);
-
-    const aspectList = Files.length ? Files[0] : null;
+      if (mediaList.length > 0) {
+        setAspectType(mediaList[0].aspectType);
+        aspectList.current = mediaList[0];
+      }
+    }, [mediaList]);
 
     // per-media state and refs
     const videoRefs = useRef<
@@ -293,31 +295,37 @@ export const MediaCanvas = React.memo(
       });
     }, [Files]);
 
-    if (!post && aspectList && activeFilter !== null) {
+    if (!post && aspectList.current && activeFilter !== null) {
       return (
         <div className="h-full w-full flex-shrink-0 snap-center overflow-hidden bg-gray-950">
-          {aspectList.mediaType === 'video' ? (
+          {aspectList.current && aspectList.current.mediaType === 'video' ? (
             <div
               ref={setItemRef(0)}
               data-index={0}
               className={`relative h-full w-full ${getMediaClasses(aspectType)} overflow-hidden rounded-lg`}>
-              <Canvas
-                id={`canvas-${aspectType}`}
-                style={{width: '100%', height: '100%', zIndex: 100}}
-                camera={{position: [0, 0, 5], fov: 50}}
-                gl={{antialias: true, alpha: true}}>
-                <FilteredMedia
-                  uri={aspectList.uri}
-                  isVideo={true}
-                  aspectType={aspectType}
-                  originalWidth={aspectList.width}
-                  originalHeight={aspectList.height}
-                  fit={post ? 'cover' : undefined}
-                  videoRef={getVideoRef(0)}
-                  handleTap={() => handleTap(0)}
-                  muted={mutedMap[0] ?? false}
-                />
-              </Canvas>
+              {aspectList.current.uri &&
+              aspectList.current.width &&
+              aspectList.current.height ? (
+                <Canvas
+                  id={`canvas-${aspectType}`}
+                  style={{width: '100%', height: '100%', zIndex: 100}}
+                  camera={{position: [0, 0, 5], fov: 50}}
+                  gl={{antialias: true, alpha: true}}>
+                  <FilteredMedia
+                    uri={aspectList.current.uri}
+                    isVideo={true}
+                    aspectType={aspectType}
+                    originalWidth={aspectList.current.width}
+                    originalHeight={aspectList.current.height}
+                    fit={post ? 'cover' : undefined}
+                    videoRef={getVideoRef(0)}
+                    handleTap={() => handleTap(0)}
+                    muted={mutedMap[0] ?? false}
+                  />
+                </Canvas>
+              ) : (
+                <></>
+              )}
 
               {/* UPDATED: Show button logic (like RN code) */}
               {(playerIconTappedMap[0] ||
@@ -363,20 +371,26 @@ export const MediaCanvas = React.memo(
             <div
               dir="ltr"
               className={`relativeh-full w-full ${getMediaClasses(aspectType)} overflow-hidden rounded-lg`}>
-              <Canvas
-                id={`canvas-${aspectType}`}
-                style={{width: '100%', height: '100%', zIndex: 100}}
-                camera={{position: [0, 0, 5], fov: 50}}
-                gl={{antialias: true, alpha: true}}>
-                <FilteredMedia
-                  uri={aspectList.uri}
-                  isVideo={false}
-                  aspectType={aspectType}
-                  originalWidth={aspectList.width}
-                  originalHeight={aspectList.height}
-                  fit={post ? 'cover' : undefined}
-                />
-              </Canvas>
+              {aspectList.current.uri &&
+              aspectList.current.width &&
+              aspectList.current.height ? (
+                <Canvas
+                  id={`canvas-${aspectType}`}
+                  style={{width: '100%', height: '100%', zIndex: 100}}
+                  camera={{position: [0, 0, 5], fov: 50}}
+                  gl={{antialias: true, alpha: true}}>
+                  <FilteredMedia
+                    uri={aspectList.current.uri}
+                    isVideo={false}
+                    aspectType={aspectType}
+                    originalWidth={aspectList.current.width}
+                    originalHeight={aspectList.current.height}
+                    fit={post ? 'cover' : undefined}
+                  />
+                </Canvas>
+              ) : (
+                <></>
+              )}
               {isApplyingFilter && (
                 <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
                   <ClipLoader
@@ -391,10 +405,10 @@ export const MediaCanvas = React.memo(
           )}
         </div>
       );
-    } else if (post && Files && Files.length && activeFilter !== null) {
+    } else if (post && mediaList && mediaList.length && activeFilter !== null) {
       return (
         <>
-          {Files.map((media, index) => (
+          {mediaList.map((media, index) => (
             <div
               ref={setItemRef(index)}
               data-index={index}
@@ -412,23 +426,27 @@ export const MediaCanvas = React.memo(
                   className={
                     'relative h-full w-full overflow-hidden rounded-lg object-cover'
                   }>
-                  <Canvas
-                    id={`canvas-${index}`}
-                    style={{width: '100%', height: '100%', zIndex: 100}}
-                    camera={{position: [0, 0, 5], fov: 50}}
-                    gl={{antialias: true, alpha: true}}>
-                    <FilteredMedia
-                      uri={media.uri}
-                      isVideo={true}
-                      aspectType={aspectType}
-                      originalWidth={media.width}
-                      originalHeight={media.height}
-                      fit={'cover'}
-                      videoRef={getVideoRef(index)}
-                      handleTap={() => handleTap(index)}
-                      muted={mutedMap[index] ?? false}
-                    />
-                  </Canvas>
+                  {media.uri && media.width && media.height ? (
+                    <Canvas
+                      id={`canvas-${index}`}
+                      style={{width: '100%', height: '100%', zIndex: 100}}
+                      camera={{position: [0, 0, 5], fov: 50}}
+                      gl={{antialias: true, alpha: true}}>
+                      <FilteredMedia
+                        uri={media.uri}
+                        isVideo={true}
+                        aspectType={aspectType}
+                        originalWidth={media.width}
+                        originalHeight={media.height}
+                        fit={'cover'}
+                        videoRef={getVideoRef(index)}
+                        handleTap={() => handleTap(index)}
+                        muted={mutedMap[index] ?? false}
+                      />
+                    </Canvas>
+                  ) : (
+                    <></>
+                  )}
 
                   {/* UPDATED: Show button logic (like RN code) */}
                   {(playerIconTappedMap[index] ||
@@ -475,20 +493,24 @@ export const MediaCanvas = React.memo(
                   className={
                     'relative h-full w-full overflow-hidden rounded-lg object-cover'
                   }>
-                  <Canvas
-                    id={`canvas-${index}`}
-                    style={{width: '100%', height: '100%', zIndex: 100}}
-                    camera={{position: [0, 0, 5], fov: 50}}
-                    gl={{antialias: true, alpha: true}}>
-                    <FilteredMedia
-                      uri={media.uri}
-                      isVideo={false}
-                      aspectType={aspectType}
-                      originalWidth={media.width}
-                      originalHeight={media.height}
-                      fit={'cover'}
-                    />
-                  </Canvas>
+                  {media.uri && media.width && media.height ? (
+                    <Canvas
+                      id={`canvas-${index}`}
+                      style={{width: '100%', height: '100%', zIndex: 100}}
+                      camera={{position: [0, 0, 5], fov: 50}}
+                      gl={{antialias: true, alpha: true}}>
+                      <FilteredMedia
+                        uri={media.uri}
+                        isVideo={false}
+                        aspectType={aspectType}
+                        originalWidth={media.width}
+                        originalHeight={media.height}
+                        fit={'cover'}
+                      />
+                    </Canvas>
+                  ) : (
+                    <></>
+                  )}
                   {isApplyingFilter && (
                     <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
                       <ClipLoader
