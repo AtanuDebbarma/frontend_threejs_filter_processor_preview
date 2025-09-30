@@ -1,6 +1,6 @@
 import type {StateCreator} from 'zustand';
 import type {AppState} from './appStore';
-import type {FilterItem} from '../types/filterTypes';
+import {defaultFilter, type FilterItem} from '../types/filterTypes';
 
 export type FilterSliceType = {
   activeFilter: FilterItem | null;
@@ -32,7 +32,7 @@ export const createFilterSlice: StateCreator<
   [],
   FilterSliceType
 > = (set, get) => ({
-  activeFilter: null,
+  activeFilter: defaultFilter,
   isApplyingFilter: false,
   clearActiveFilter: async () => {
     try {
@@ -46,7 +46,7 @@ export const createFilterSlice: StateCreator<
       await new Promise<void>(resolve => {
         window.setTimeout(() => {
           set(state => {
-            state.activeFilter = null;
+            state.activeFilter = defaultFilter;
           });
           resolve();
         }, 200);
@@ -82,7 +82,7 @@ export const createFilterSlice: StateCreator<
 
   setActiveFilter: async (filter: FilterItem | null) => {
     try {
-      if (filter === undefined) {
+      if (!filter) {
         throw new Error('Filter is undefined');
       }
       set(state => {

@@ -1,9 +1,8 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect} from 'react';
 
 import {appStore} from './store/appStore';
 import {
   defaultFilter,
-  type ColorBalance,
   type FilterItem,
   type MediaFile,
 } from './types/filterTypes';
@@ -16,36 +15,31 @@ import {
   setupConsoleInterception,
   setupGlobalErrorHandling,
 } from './utils/rnLogger';
-import {hashObject} from './helpers/hashObjects';
+import {ClipLoader} from 'react-spinners';
+import {applyHydrationData, trimBase64} from './helpers/helpers';
+import {
+  getDefaultEditorValues,
+  type MediaEditorValues,
+} from './store/editorSlice';
 
-type HydrationPayload = {
+export type HydrationPayload = {
   file: MediaFile[];
   post: boolean;
-  activeFilter: FilterItem | null;
+  activeFilter: FilterItem;
 };
-type PatchPayload = {
-  activeFilter: FilterItem | null;
-  brightness: number;
-  contrast: number;
-  saturation: number;
-  gamma: number;
-  hue: number;
-  colorBalance: ColorBalance;
-  sharpness: number;
-  shadows: number;
-  highlights: number;
-  temperature: number;
-  blur: number;
+export type PatchPayload = {
+  activeFilter: FilterItem;
+  editorValuesByMedia: Record<string, MediaEditorValues>;
 };
 
 const App = (): React.JSX.Element => {
   const activeFilter = appStore(state => state.activeFilter);
-  // const mediaFiles = appStore(state => state.mediaFiles);
+  const mediaFiles = appStore(state => state.mediaFiles);
   const setMediaFiles = appStore(state => state.setMediaFiles);
   const setActiveFilter = appStore(state => state.setActiveFilter);
-  const resetEditorState = appStore(state => state.resetEditorState);
+  const setEditorValues = appStore(state => state.setEditorValues);
   const [post, setPost] = React.useState(true);
-  const lastHydrationHash = useRef<string | null>(null);
+  const [isInitializing, setInitializing] = React.useState(true);
 
   // ✅ Setup logging and global error handling
   useEffect(() => {
@@ -100,23 +94,34 @@ const App = (): React.JSX.Element => {
   // }, []);
 
   useEffect(() => {
-    const listener = () => {
+    const listener = async () => {
       const data: HydrationPayload = (window as any).__EXPO_MEDIA__;
-      if (!data) return;
+      if (!data) {
+        rnLogger.log('⚠️ No __EXPO_MEDIA__ found on window');
+        return;
+      }
+      const payload = trimBase64({files: data.file});
+      rnLogger.log('📥 Processing injected HYDRATE', payload);
+      await applyHydrationData(
+        data,
+        'Injection',
+        setMediaFiles,
+        setPost,
+        setActiveFilter,
+      );
 
-      const hash = hashObject(data);
-      lastHydrationHash.current = hash; // store injected payload hash
-
-      rnLogger.log('📥 Injected HYDRATE from RN:', data);
-
-      setMediaFiles(data.file ?? []);
-      setPost(data.post);
-      const filter = data.activeFilter ?? defaultFilter;
-      setActiveFilter(filter);
+      // Notify RN that web is ready
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({type: 'WEB_READY'}),
+        );
+      }
     };
 
     window.addEventListener('mediaReady', listener);
-    listener(); // run once immediately
+
+    // Also try to run immediately in case the event already fired
+    listener();
 
     return () => {
       window.removeEventListener('mediaReady', listener);
@@ -125,57 +130,37 @@ const App = (): React.JSX.Element => {
   }, []);
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    // Handle messages from RN
+    const handleDocumentMessage = (event: MessageEvent) => {
       try {
         const msg = JSON.parse(event.data);
-
-        if (msg.type === 'HYDRATE') {
-          const data: HydrationPayload = msg.payload;
-          const newHash = hashObject(data);
-
-          // 🚫 Skip if identical to last applied
-          if (lastHydrationHash.current === newHash) {
-            rnLogger.log('⏸ Ignoring redundant HYDRATE (same as injected)');
-            return;
-          }
-
-          rnLogger.log('📥 Applying HYDRATE from RN:', data);
-          lastHydrationHash.current = newHash;
-
-          setMediaFiles(data.file ?? []);
-          setPost(data.post);
-          const filter = data.activeFilter ?? defaultFilter;
-          setActiveFilter(filter);
-        }
+        rnLogger.log('📨 Received message via document:', msg.type);
 
         if (msg.type === 'PATCH_STATE') {
-          rnLogger.log('🎨 PATCH_STATE update:', msg.payload);
+          rnLogger.log('🎨 PATCH_STATE update (document):', msg.payload);
           const data: PatchPayload = msg.payload;
           const filter = data.activeFilter ?? defaultFilter;
           setActiveFilter(filter);
-          const p = defaultFilter.params;
-          resetEditorState({
-            brightness: data.brightness ?? p.brightness ?? 0.0,
-            contrast: data.contrast ?? p.contrast ?? 1.0,
-            saturation: data.saturation ?? p.saturation ?? 1.0,
-            gamma: data.gamma ?? p.gamma ?? 1.0,
-            hue: data.hue ?? p.hue ?? 0.0,
-            colorBalance: data.colorBalance ??
-              p.colorBalance ?? {r: 0, g: 0, b: 0},
-            sharpness: data.sharpness ?? p.unsharp?.amount ?? 0.0,
-            shadows: data.shadows ?? p.shadows ?? 0.0,
-            highlights: data.highlights ?? p.highlights ?? 0.0,
-            temperature: data.temperature ?? p.temperature ?? 0.0,
-            blur: data.blur ?? p.blur ?? 0.0,
-          });
+          // Update the entire editorValuesByMedia map
+          const editorMap = data.editorValuesByMedia;
+          if (editorMap) {
+            Object.entries(editorMap).forEach(([mediaId, values]) => {
+              setEditorValues(mediaId, values ?? getDefaultEditorValues());
+            });
+          }
         }
       } catch (err) {
-        rnLogger.error('⚠️ Bad message from RN:', event.data, err);
+        rnLogger.error('⚠️ Bad message from RN via document:', event.data, err);
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    document.addEventListener('message', handleDocumentMessage as any);
+
+    rnLogger.log('🎧 Message listeners set up on document');
+
+    return () => {
+      document.removeEventListener('message', handleDocumentMessage as any);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -183,6 +168,27 @@ const App = (): React.JSX.Element => {
     rnLogger.log('🎨 Active filter changed:', activeFilter);
   }, [activeFilter]);
 
+  useEffect(() => {
+    if (!mediaFiles.length || !activeFilter) {
+      setInitializing(true);
+    } else {
+      setInitializing(false);
+    }
+  }, [mediaFiles, activeFilter]);
+
+  // Early return for loading state - kept as is
+  if (isInitializing) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-transparent">
+        <ClipLoader
+          size={40}
+          color="#FF4800"
+          cssOverride={{borderWidth: '3.5px'}}
+        />
+      </div>
+    );
+  }
+  console.log(post);
   return (
     <main className="flex h-screen w-screen items-center justify-center bg-black text-white">
       <div className="mx-auto flex h-full max-w-full flex-1 flex-col bg-gray-900">

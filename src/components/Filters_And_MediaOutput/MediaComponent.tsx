@@ -7,7 +7,7 @@ type PROPS = {
   post: boolean;
 };
 
-export const MediaComponent = React.memo(({post}: PROPS): React.JSX.Element => {
+export const MediaComponent = ({post}: PROPS): React.JSX.Element => {
   const windowSize = useWindowSize();
 
   const [mediaSizes, setMediaSizes] = useState<Record<
@@ -92,7 +92,7 @@ export const MediaComponent = React.memo(({post}: PROPS): React.JSX.Element => {
       )}
     </section>
   );
-});
+};
 
 /*
  * @displayName MediaComponent

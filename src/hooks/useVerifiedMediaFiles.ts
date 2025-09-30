@@ -1,6 +1,7 @@
 // src/hooks/useVerifiedMediaFiles.ts
 import {useEffect, useRef, useState} from 'react';
 import {rnLogger} from '../utils/rnLogger';
+import {trimBase64} from '../helpers/helpers';
 
 export type AspectType = 'square' | 'landscape' | 'vertical';
 
@@ -76,7 +77,8 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
           uri = URL.createObjectURL(blob);
           createdUrlsRef.current.push(uri);
         } catch (err) {
-          rnLogger.warn(`❌ Failed to fetch media URI: ${uri}`, err);
+          const trimmedUri = trimBase64({singleFile: uri});
+          rnLogger.warn(`❌ Failed to fetch media URI: ${trimmedUri}`, err);
         }
       }
 
@@ -87,6 +89,9 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
           v.preload = 'metadata';
           v.muted = true;
           v.playsInline = true;
+          if (!uri.startsWith('data:') && !isRNLocalUrl(uri)) {
+            v.crossOrigin = 'anonymous';
+          }
           v.src = uri;
 
           const cleanup = () => {
@@ -120,7 +125,8 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
           v.addEventListener(
             'error',
             () => {
-              rnLogger.warn(`❌ Failed to load video metadata: ${uri}`);
+              const trimmedUri = trimBase64({singleFile: uri});
+              rnLogger.warn(`❌ Failed to load video metadata: ${trimmedUri}`);
               resolve({
                 ...file,
                 uri,
@@ -139,7 +145,10 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
       // For photo (remote/blob)
       return new Promise(resolve => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        if (!uri.startsWith('data:') && !isRNLocalUrl(uri)) {
+          img.crossOrigin = 'anonymous';
+        }
+
         img.src = uri;
 
         const cleanup = () => {
@@ -167,7 +176,8 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
         };
 
         img.onerror = () => {
-          rnLogger.warn(`❌ Failed to load image metadata: ${file.uri}`);
+          const trimmedUri = trimBase64({singleFile: file.uri});
+          rnLogger.warn(`❌ Failed to load image metadata: ${trimmedUri}`);
           resolve({
             ...file,
             uri,

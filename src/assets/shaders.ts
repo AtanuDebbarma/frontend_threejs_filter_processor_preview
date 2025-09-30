@@ -1,4 +1,4 @@
-//src/assets/shaders.ts
+// src/assets/shaders.ts
 
 export const vertexShader = `
   varying vec2 vUv;
@@ -9,7 +9,8 @@ export const vertexShader = `
 `;
 
 export const fragmentShader = `
-  precision highp float;
+  // ✅ Always use mediump for safer WebGL memory on all devices
+  precision mediump float;
 
   uniform sampler2D tDiffuse;
   uniform float brightness;
@@ -30,7 +31,7 @@ export const fragmentShader = `
 
   varying vec2 vUv;
 
-  // ---------- limited range helpers (approx) ----------
+  // ---------- limited range helpers ----------
   vec3 limitedToFull(vec3 c) {
     float ymin = 16.0/255.0;
     float ymax = 235.0/255.0;
@@ -38,7 +39,7 @@ export const fragmentShader = `
     return (c - vec3(ymin)) * vec3(scale);
   }
 
-  // ---------- sRGB transfer (exact piecewise) ----------
+  // ---------- sRGB transfer ----------
   vec3 sRGBToLinear(vec3 c) {
     vec3 cutoff = step(vec3(0.04045), c);
     vec3 low = c / 12.92;
@@ -52,7 +53,7 @@ export const fragmentShader = `
     return mix(low, high, cutoff);
   }
 
-  // ---------- Rec.709 transfer (piecewise) ----------
+  // ---------- Rec.709 transfer ----------
   vec3 rec709ToLinear(vec3 c) {
     vec3 mask = step(vec3(0.081), c);
     vec3 low = c / 4.5;
@@ -66,7 +67,7 @@ export const fragmentShader = `
     return mix(low, high, mask);
   }
 
-  // ---------- color math helpers ----------
+  // ---------- math helpers ----------
   vec3 applyContrast(vec3 col, float cont) {
     return ((col - 0.5) * cont) + 0.5;
   }
@@ -76,29 +77,19 @@ export const fragmentShader = `
     return mix(vec3(l), color, sat);
   }
 
+  // ✅ simplified hue rotation (lighter on ALU than full YIQ)
   vec3 hueRotate(vec3 color, float angle) {
-    const mat3 rgb2yiq = mat3(
-      0.299, 0.587, 0.114,
-      0.596, -0.274, -0.322,
-      0.211, -0.523, 0.312
-    );
-    const mat3 yiq2rgb = mat3(
-      1.0, 0.956, 0.621,
-      1.0, -0.272, -0.647,
-      1.0, -1.105, 1.702
-    );
-    vec3 yiq = rgb2yiq * color;
     float cs = cos(angle);
     float sn = sin(angle);
     mat3 rot = mat3(
-      1.0, 0.0, 0.0,
-      0.0, cs, -sn,
-      0.0, sn, cs
+      cs + (1.0 - cs) / 3.0, 1.0/3.0 * (1.0 - cs) - sn / sqrt(3.0), 1.0/3.0 * (1.0 - cs) + sn / sqrt(3.0),
+      1.0/3.0 * (1.0 - cs) + sn / sqrt(3.0), cs + 1.0/3.0 * (1.0 - cs), 1.0/3.0 * (1.0 - cs) - sn / sqrt(3.0),
+      1.0/3.0 * (1.0 - cs) - sn / sqrt(3.0), 1.0/3.0 * (1.0 - cs) + sn / sqrt(3.0), cs + 1.0/3.0 * (1.0 - cs)
     );
-    vec3 yiq2 = rot * yiq;
-    return yiq2rgb * yiq2;
+    return rot * color;
   }
 
+  // ✅ small 3x3 blur only (safe for WebView)
   vec3 boxBlur(sampler2D samp, vec2 uv) {
     vec2 texel = 1.0 / vec2(textureSize(samp, 0));
     vec3 sum = vec3(0.0);
@@ -110,7 +101,6 @@ export const fragmentShader = `
     return sum / 9.0;
   }
 
-  // Temperature adjustment function (approximate)
   vec3 applyTemperature(vec3 color, float temp) {
     float t = temp / 100.0;
     color.r += t * 0.1;
@@ -118,7 +108,6 @@ export const fragmentShader = `
     return clamp(color, 0.0, 1.0);
   }
 
-  // Shadows and highlights adjustment (simple approximation)
   vec3 applyShadowsHighlights(vec3 color, float shadowsVal, float highlightsVal) {
     color = mix(color, vec3(0.0), shadowsVal < 0.0 ? -shadowsVal : 0.0);
     color = mix(color, vec3(1.0), highlightsVal > 0.0 ? highlightsVal : 0.0);
@@ -139,9 +128,11 @@ export const fragmentShader = `
       c = rec709ToLinear(c);
     }
 
+    // eq (brightness / contrast / sat)
     c += vec3(brightness);
     c = applyContrast(c, contrast);
     c = applySaturation(c, saturation);
+
     c += colorBalance;
 
     if (abs(hue) > 0.0001) {
@@ -155,25 +146,28 @@ export const fragmentShader = `
     }
 
     c = applyShadowsHighlights(c, shadows, highlights);
-
     c = applyTemperature(c, temperature);
 
+    // ✅ unsharp: capped for WebView
     if (unsharpAmount > 0.0001) {
+      float capped = min(unsharpAmount, 0.8);
       vec3 orig = c;
       vec3 blurSrgb = boxBlur(tDiffuse, vUv);
       vec3 blurLinear;
       if (u_colorSpace < 0.5) blurLinear = sRGBToLinear(blurSrgb);
       else if (u_colorSpace < 1.5) blurLinear = rec709ToLinear(blurSrgb);
       else blurLinear = blurSrgb;
-      c = mix(orig, orig + (orig - blurLinear) * unsharpAmount, 1.0);
+      c = mix(orig, orig + (orig - blurLinear) * capped, 1.0);
     }
 
+    // ✅ blur: capped for WebView
     if (blur > 0.01) {
+      float cappedBlur = min(blur, 0.2);
       vec3 blurred = boxBlur(tDiffuse, vUv);
-      c = mix(c, blurred, blur / 10.0);
+      c = mix(c, blurred, cappedBlur / 10.0);
     }
 
-    if (gammaVal > 0.0) {
+    if (abs(gammaVal - 1.0) > 0.001) {
       c = pow(c, vec3(1.0 / gammaVal));
     }
 

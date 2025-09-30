@@ -17,6 +17,6 @@ export const createFileSlice: StateCreator<
   selectedMediaIndex: 0,
   setMediaFiles: (files: MediaFile[] | []) =>
     set(state => {
-      state.mediaFiles = files;
+      state.mediaFiles = [...files].map(f => ({...f}));
     }),
 });
