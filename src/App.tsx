@@ -3,6 +3,7 @@ import React, {useEffect} from 'react';
 import {appStore} from './store/appStore';
 import {
   defaultFilter,
+  type ColorBalance,
   type FilterItem,
   type MediaFile,
 } from './types/filterTypes';
@@ -17,10 +18,6 @@ import {
 } from './utils/rnLogger';
 import {ClipLoader} from 'react-spinners';
 import {applyHydrationData, trimBase64} from './helpers/helpers';
-import {
-  getDefaultEditorValues,
-  type MediaEditorValues,
-} from './store/editorSlice';
 
 export type HydrationPayload = {
   file: MediaFile[];
@@ -29,7 +26,17 @@ export type HydrationPayload = {
 };
 export type PatchPayload = {
   activeFilter: FilterItem;
-  editorValuesByMedia: Record<string, MediaEditorValues>;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  gamma: number;
+  hue: number;
+  colorBalance: ColorBalance;
+  sharpness: number;
+  shadows: number;
+  highlights: number;
+  temperature: number;
+  blur: number;
 };
 
 const App = (): React.JSX.Element => {
@@ -37,7 +44,7 @@ const App = (): React.JSX.Element => {
   const mediaFiles = appStore(state => state.mediaFiles);
   const setMediaFiles = appStore(state => state.setMediaFiles);
   const setActiveFilter = appStore(state => state.setActiveFilter);
-  const setEditorValues = appStore(state => state.setEditorValues);
+  const resetEditorState = appStore(state => state.resetEditorState);
   const [post, setPost] = React.useState(true);
   const [isInitializing, setInitializing] = React.useState(true);
 
@@ -141,13 +148,21 @@ const App = (): React.JSX.Element => {
           const data: PatchPayload = msg.payload;
           const filter = data.activeFilter ?? defaultFilter;
           setActiveFilter(filter);
-          // Update the entire editorValuesByMedia map
-          const editorMap = data.editorValuesByMedia;
-          if (editorMap) {
-            Object.entries(editorMap).forEach(([mediaId, values]) => {
-              setEditorValues(mediaId, values ?? getDefaultEditorValues());
-            });
-          }
+          const p = defaultFilter.params;
+          resetEditorState({
+            brightness: data.brightness ?? p.brightness ?? 0.0,
+            contrast: data.contrast ?? p.contrast ?? 1.0,
+            saturation: data.saturation ?? p.saturation ?? 1.0,
+            gamma: data.gamma ?? p.gamma ?? 1.0,
+            hue: data.hue ?? p.hue ?? 0.0,
+            colorBalance: data.colorBalance ??
+              p.colorBalance ?? {r: 0, g: 0, b: 0},
+            sharpness: data.sharpness ?? p.unsharp?.amount ?? 0.0,
+            shadows: data.shadows ?? p.shadows ?? 0.0,
+            highlights: data.highlights ?? p.highlights ?? 0.0,
+            temperature: data.temperature ?? p.temperature ?? 0.0,
+            blur: data.blur ?? p.blur ?? 0.0,
+          });
         }
       } catch (err) {
         rnLogger.error('⚠️ Bad message from RN via document:', event.data, err);

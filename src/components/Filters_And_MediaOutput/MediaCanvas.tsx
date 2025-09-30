@@ -22,7 +22,6 @@ export const MediaCanvas = ({post}: {post: boolean}): React.ReactNode => {
   // const activeFilter = appStore(state => state.activeFilter);
   const mediaFiles = appStore(state => state.mediaFiles);
   const isApplyingFilter = appStore(state => state.isApplyingFilter);
-  const setActiveMediaId = appStore(state => state.setActiveMediaId);
 
   const [initialized, setInitialized] = useState(false);
   const [aspectType, setAspectType] = useState<
@@ -309,25 +308,6 @@ export const MediaCanvas = ({post}: {post: boolean}): React.ReactNode => {
     });
   }, [mediaList]);
 
-  useEffect(() => {
-    if (activeIndex !== null && mediaList[activeIndex]) {
-      setActiveMediaId(mediaList[activeIndex].id);
-      // Send active media ID back to RN
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            type: 'ACTIVE_MEDIA_CHANGED',
-            payload: {
-              index: activeIndex,
-              mediaId: mediaList[activeIndex].id,
-            },
-          }),
-        );
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIndex, mediaList]);
-
   // Early return for loading state - kept as is
   if (!initialized || !mediaList.length) {
     return (
@@ -358,7 +338,6 @@ export const MediaCanvas = ({post}: {post: boolean}): React.ReactNode => {
                   uri={mediaList[0].uri}
                   isVideo={true}
                   aspectType={aspectType}
-                  mediaId={mediaList[0].id}
                   originalWidth={mediaList[0].width}
                   originalHeight={mediaList[0].height}
                   fit={post ? 'cover' : undefined}
@@ -423,7 +402,6 @@ export const MediaCanvas = ({post}: {post: boolean}): React.ReactNode => {
                   uri={mediaList[0].uri}
                   isVideo={false}
                   aspectType={aspectType}
-                  mediaId={mediaList[0].id}
                   originalWidth={mediaList[0].width}
                   originalHeight={mediaList[0].height}
                   fit={post ? 'cover' : undefined}
@@ -477,7 +455,6 @@ export const MediaCanvas = ({post}: {post: boolean}): React.ReactNode => {
                       uri={media.uri}
                       isVideo={true}
                       aspectType={aspectType}
-                      mediaId={media.id}
                       originalWidth={media.width}
                       originalHeight={media.height}
                       fit={'cover'}
@@ -545,7 +522,6 @@ export const MediaCanvas = ({post}: {post: boolean}): React.ReactNode => {
                       uri={media.uri}
                       isVideo={false}
                       aspectType={aspectType}
-                      mediaId={media.id}
                       originalWidth={media.width}
                       originalHeight={media.height}
                       fit={'cover'}

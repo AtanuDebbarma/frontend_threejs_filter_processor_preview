@@ -3,7 +3,7 @@ import type {AppState} from './appStore';
 import {defaultFilter, type FilterItem} from '../types/filterTypes';
 
 export type FilterSliceType = {
-  activeFilter: FilterItem | null;
+  activeFilter: FilterItem;
   isApplyingFilter: boolean;
   setIsApplyingFilter: (loading: boolean) => Promise<void>;
   setActiveFilter: (filter: FilterItem | null) => Promise<void>;

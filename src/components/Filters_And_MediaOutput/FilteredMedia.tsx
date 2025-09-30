@@ -8,14 +8,12 @@ import {scheduleClearApplying} from '../../utils/filter_utils';
 import {vertexShader, fragmentShader} from '../../assets/shaders';
 import {rnLogger} from '../../utils/rnLogger';
 import {trimBase64} from '../../helpers/helpers';
-import {getDefaultEditorValues} from '../../store/editorSlice';
 
 type Props = {
   uri: string;
   isVideo: boolean;
   fit?: 'contain' | 'cover';
   aspectType?: 'square' | 'landscape' | 'vertical';
-  mediaId: string;
   originalWidth?: number;
   originalHeight?: number;
   videoRef?: React.RefObject<HTMLVideoElement | null>;
@@ -34,14 +32,17 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
 
   const activeFilter = appStore(state => state.activeFilter);
   const setIsApplyingFilter = appStore(state => state.setIsApplyingFilter);
-
-  const editorValues = appStore(state => state.editorValues);
-
-  // Get editor values for THIS specific media
-  const mediaEditorValues = props.mediaId
-    ? (editorValues[props.mediaId] ?? getDefaultEditorValues())
-    : getDefaultEditorValues();
-
+  const brightness = appStore(state => state.brightness);
+  const contrast = appStore(state => state.contrast);
+  const saturation = appStore(state => state.saturation);
+  const gamma = appStore(state => state.gamma);
+  const hue = appStore(state => state.hue);
+  const colorBalance: ColorBalance = appStore(state => state.colorBalance);
+  const sharpness = appStore(state => state.sharpness);
+  const shadows = appStore(state => state.shadows);
+  const highlights = appStore(state => state.highlights);
+  const temperature = appStore(state => state.temperature);
+  const blur = appStore(state => state.blur);
   const isRNLocalUrl = (url: string) =>
     url.startsWith('file:') ||
     url.startsWith('content:') ||
@@ -638,20 +639,17 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     const {csVal, rangeVal} = resolveColorSpaceAndRange(activeFilter);
 
     const merged = {
-      brightness: mediaEditorValues.brightness ?? p.brightness ?? 0.0,
-      contrast: mediaEditorValues.contrast ?? p.contrast ?? 1.0,
-      saturation: mediaEditorValues.saturation ?? p.saturation ?? 1.0,
-      gamma: mediaEditorValues.gamma ?? p.gamma ?? 1.0,
-      hue: mediaEditorValues.hue ?? p.hue ?? 0.0,
-      colorBalance:
-        mediaEditorValues.colorBalance ??
-        p.colorBalance ??
-        ({r: 0, g: 0, b: 0} as ColorBalance),
-      unsharpAmount: mediaEditorValues.sharpness ?? p.unsharp?.amount ?? 0.0,
-      shadows: mediaEditorValues.shadows ?? p.shadows ?? 0.0,
-      highlights: mediaEditorValues.highlights ?? p.highlights ?? 0.0,
-      temperature: mediaEditorValues.temperature ?? p.temperature ?? 0.0,
-      blur: mediaEditorValues.blur ?? p.blur ?? 0.0,
+      brightness: brightness ?? p.brightness ?? 0.0,
+      contrast: contrast ?? p.contrast ?? 1.0,
+      saturation: saturation ?? p.saturation ?? 1.0,
+      gamma: gamma ?? p.gamma ?? 1.0,
+      hue: hue ?? p.hue ?? 0.0,
+      colorBalance: colorBalance ?? p.colorBalance ?? {r: 0, g: 0, b: 0},
+      unsharpAmount: sharpness ?? p.unsharp?.amount ?? 0.0,
+      shadows: shadows ?? p.shadows ?? 0.0,
+      highlights: highlights ?? p.highlights ?? 0.0,
+      temperature: temperature ?? p.temperature ?? 0.0,
+      blur: blur ?? p.blur ?? 0.0,
     };
 
     const uniforms: any = {
@@ -696,19 +694,19 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     curveTexture,
     curvePresent,
     resolveColorSpaceAndRange,
-    mediaEditorValues.brightness,
-    mediaEditorValues.contrast,
-    mediaEditorValues.saturation,
-    mediaEditorValues.gamma,
-    mediaEditorValues.hue,
-    mediaEditorValues.colorBalance?.r,
-    mediaEditorValues.colorBalance?.g,
-    mediaEditorValues.colorBalance?.b,
-    mediaEditorValues.sharpness,
-    mediaEditorValues.shadows,
-    mediaEditorValues.highlights,
-    mediaEditorValues.temperature,
-    mediaEditorValues.blur,
+    brightness,
+    contrast,
+    saturation,
+    gamma,
+    hue,
+    colorBalance?.r,
+    colorBalance?.g,
+    colorBalance?.b,
+    sharpness,
+    shadows,
+    highlights,
+    temperature,
+    blur,
   ]);
   // keep material texture uniform updated when mediaTextureState changes
   useEffect(() => {
@@ -732,20 +730,17 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     const {csVal, rangeVal} = resolveColorSpaceAndRange(activeFilter);
 
     const merged = {
-      brightness: mediaEditorValues.brightness ?? p.brightness ?? 0.0,
-      contrast: mediaEditorValues.contrast ?? p.contrast ?? 1.0,
-      saturation: mediaEditorValues.saturation ?? p.saturation ?? 1.0,
-      gamma: mediaEditorValues.gamma ?? p.gamma ?? 1.0,
-      hue: mediaEditorValues.hue ?? p.hue ?? 0.0,
-      colorBalance:
-        mediaEditorValues.colorBalance ??
-        p.colorBalance ??
-        ({r: 0, g: 0, b: 0} as ColorBalance),
-      unsharpAmount: mediaEditorValues.sharpness ?? p.unsharp?.amount ?? 0.0,
-      shadows: mediaEditorValues.shadows ?? p.shadows ?? 0.0,
-      highlights: mediaEditorValues.highlights ?? p.highlights ?? 0.0,
-      temperature: mediaEditorValues.temperature ?? p.temperature ?? 0.0,
-      blur: mediaEditorValues.blur ?? p.blur ?? 0.0,
+      brightness: brightness ?? p.brightness ?? 0.0,
+      contrast: contrast ?? p.contrast ?? 1.0,
+      saturation: saturation ?? p.saturation ?? 1.0,
+      gamma: gamma ?? p.gamma ?? 1.0,
+      hue: hue ?? p.hue ?? 0.0,
+      colorBalance: colorBalance ?? p.colorBalance ?? {r: 0, g: 0, b: 0},
+      unsharpAmount: sharpness ?? p.unsharp?.amount ?? 0.0,
+      shadows: shadows ?? p.shadows ?? 0.0,
+      highlights: highlights ?? p.highlights ?? 0.0,
+      temperature: temperature ?? p.temperature ?? 0.0,
+      blur: blur ?? p.blur ?? 0.0,
     };
 
     mat.uniforms.brightness.value = merged.brightness;
@@ -775,19 +770,19 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     curveTexture,
     curvePresent,
     props.isVideo,
-    mediaEditorValues.brightness,
-    mediaEditorValues.contrast,
-    mediaEditorValues.saturation,
-    mediaEditorValues.gamma,
-    mediaEditorValues.hue,
-    mediaEditorValues.colorBalance?.r,
-    mediaEditorValues.colorBalance?.g,
-    mediaEditorValues.colorBalance?.b,
-    mediaEditorValues.sharpness,
-    mediaEditorValues.shadows,
-    mediaEditorValues.highlights,
-    mediaEditorValues.temperature,
-    mediaEditorValues.blur,
+    brightness,
+    contrast,
+    saturation,
+    gamma,
+    hue,
+    colorBalance?.r,
+    colorBalance?.g,
+    colorBalance?.b,
+    sharpness,
+    shadows,
+    highlights,
+    temperature,
+    blur,
   ]);
 
   // prev material disposal to avoid leaks when material changes
