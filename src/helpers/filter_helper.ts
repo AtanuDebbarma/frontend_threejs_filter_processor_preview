@@ -1,51 +1,90 @@
+// src/helpers/filter_helper.ts
+import {rnLogger} from '../utils/rnLogger';
+
 /**
- * @description
- * Generates a PNG thumbnail of a video.
- * @param {File} file - The video file.
- * @param {number} [seekTo=1] - Seek to this time in seconds before generating
- * thumbnail.
- * @returns {Promise<string>} A Promise that resolves to a thumbnail as a PNG
- * data URL.
+ * Get (or return cached) video thumbnail for a given media index.
+ * Caches the generated thumbnail (dataURL) in thumbCache Map.
+ *
+ * @param uri - Video file URI
+ * @param index - Media index (used as cache key)
+ * @param seekTo - Seconds to seek for frame (default 0.5)
+ * @param maxWidth - Max width of thumbnail (default 320)
+ * @param thumbCache - Map<number,string> of cached thumbnails
+ * @param setThumbCache - Store updater: (index, dataUrl) => void
  */
 export const getVideoThumbnail = async (
-  file: File,
-  seekTo: number = 1,
+  uri: string,
+  index: number,
+  seekTo = 0.5,
+  maxWidth = 320,
+  thumbCache?: Map<number, string>,
+  setThumbCache?: (idx: number, dataUrl: string) => void,
 ): Promise<string> => {
+  // ✅ Early return if already cached
+  if (thumbCache?.has(index)) {
+    return thumbCache.get(index)!;
+  }
+
   const video = document.createElement('video');
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas context unavailable');
 
-  if (!ctx) throw new Error('Canvas context error');
+  let sourceUri = uri;
+  let createdObjectUrl: string | null = null;
 
-  const objectUrl = URL.createObjectURL(file);
-  video.src = objectUrl;
-  video.preload = 'metadata';
-  video.muted = true;
-  video.playsInline = true;
+  try {
+    // Handle remote URIs → fetch blob → object URL
+    if (!uri.startsWith('blob:') && !uri.startsWith('data:')) {
+      const res = await fetch(uri);
+      if (!res.ok) throw new Error(`Failed to fetch video: ${res.status}`);
+      const blob = await res.blob();
+      sourceUri = URL.createObjectURL(blob);
+      createdObjectUrl = sourceUri;
+    }
 
-  // Wait for metadata to load so we know duration and dimensions
-  await new Promise<void>((resolve, reject) => {
-    video.onloadedmetadata = () => resolve();
-    video.onerror = () => reject(new Error('Error loading video metadata'));
-  });
+    // Setup video
+    video.src = sourceUri;
+    video.preload = 'metadata';
+    video.muted = true;
+    (video as any).playsInline = true;
 
-  // Cap seekTo to duration
-  const safeSeekTo = Math.min(seekTo, video.duration || seekTo);
-  video.currentTime = safeSeekTo;
+    // Wait for metadata
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error('Error loading video metadata'));
+    });
 
-  // Wait for seek to complete
-  await new Promise<void>((resolve, reject) => {
-    video.onseeked = () => resolve();
-    video.onerror = () => reject(new Error('Error seeking video'));
-  });
+    // Safe seek (avoid exactly duration)
+    const safeSeek = Math.min(seekTo, video.duration || seekTo);
+    video.currentTime = Math.min(
+      safeSeek,
+      Math.max(0, (video.duration || safeSeek) - 0.001),
+    );
 
-  // Set canvas size and draw frame
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Wait for seek
+    await new Promise<void>((resolve, reject) => {
+      video.onseeked = () => resolve();
+      video.onerror = () => reject(new Error('Error seeking video'));
+    });
 
-  const thumbnail = canvas.toDataURL('image/png');
+    // Draw frame
+    const scale = Math.min(maxWidth / video.videoWidth, 1);
+    canvas.width = Math.floor(video.videoWidth * scale);
+    canvas.height = Math.floor(video.videoHeight * scale);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  URL.revokeObjectURL(objectUrl);
-  return thumbnail;
+    const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+
+    // ✅ Save to cache
+    setThumbCache?.(index, thumbnail);
+
+    return thumbnail;
+  } catch (err) {
+    rnLogger.error?.('getVideoThumbnail', err);
+    throw err;
+  } finally {
+    if (createdObjectUrl) URL.revokeObjectURL(createdObjectUrl);
+    video.src = '';
+  }
 };

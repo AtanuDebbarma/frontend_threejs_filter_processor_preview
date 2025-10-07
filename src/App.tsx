@@ -1,102 +1,319 @@
 import React, {useEffect} from 'react';
-import TopBar from './components/Others/TopBar';
-import BottomBar from './components/Menus/BottomBar';
-import MediaCanvas from './components/Filters_And_MediaOutput/MediaCanvas';
-import {appStore} from './store/appStore';
-import {FilterMenu} from './components/Menus/FilterMenu';
-import StickerMenu from './components/Menus/StickerMenu';
-import AudioMenu from './components/Menus/AudioMenu';
-import {EditorMenu} from './components/Menus/EditorMenu';
-import {FILTERS} from './assets/filters/filterData';
-import {TextMenu} from './components/Menus/TextMenu';
 
-const App = ({post = true}: {post?: boolean}): React.JSX.Element => {
+import {appStore} from './store/appStore';
+import {type FilterItem, type MediaFile} from './types/filterTypes';
+import MediaComponent from './components/Filters_And_MediaOutput/MediaComponent';
+// import VideoSRC from './assets/test.mp4';
+// import VideoSRC2 from './assets/ufc.mp4';
+// import SRC2 from './assets/test.jpg';
+import {
+  rnLogger,
+  setupConsoleInterception,
+  setupGlobalErrorHandling,
+} from './utils/rnLogger';
+import {ClipLoader} from 'react-spinners';
+import {applyHydrationData, trimBase64} from './helpers/other_helpers';
+import {AudioMenu} from './components/Menus/AudioMenu';
+import BottomBar from './components/Menus/BottomBar';
+import {EditorMenu} from './components/Menus/EditorMenu';
+import {FilterMenu} from './components/Menus/FilterMenu';
+import {StickerMenu} from './components/Menus/StickerMenu';
+import {TextMenu} from './components/Menus/TextMenu';
+import {EditorMenuMain} from './components/Menus/EditorMenuMain';
+import {AdjustMenu} from './components/Menus/AdjustMenu';
+import type {AdjustRecord} from './store/adjustSlice';
+import type {EditorRecord} from './store/editorSlice';
+import {normalizeForExport} from './helpers/exportHelpers';
+
+export type HydrationPayload = {
+  file: MediaFile[];
+  post: boolean;
+  insets: Insets;
+};
+export type PatchPayload = {
+  requestedExport: boolean;
+  appColors: AppColors;
+  insets: Insets;
+};
+export type AppColors = {
+  backgroundColorMain: string;
+  bottomMenuBackground: string;
+  textColor: string;
+  buttonColor: string;
+};
+export type Insets = {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+};
+
+const App = (): React.JSX.Element => {
+  const activeFilter: FilterItem = appStore(state => state.activeFilter);
   const mediaFiles = appStore(state => state.mediaFiles);
   const setMediaFiles = appStore(state => state.setMediaFiles);
+  const requestedExport = appStore(state => state.requestedExport);
+  const requestedSave = appStore(state => state.requestedSave);
+  const setRequestedSave = appStore(state => state.setRequestedSave);
+  const setRequestedExport = appStore(state => state.setRequestedExport);
+  const tagMode = appStore(state => state.tagMode);
+  const currentEditorValues: EditorRecord = appStore(
+    state => state.editorByIndex,
+  );
+  const currentStoreAdjust: AdjustRecord = appStore(
+    state => state.adjustByIndex,
+  );
+  const [post, setPost] = React.useState(true);
+  const [isInitializing, setInitializing] = React.useState(true);
+  const [appColors, setAppColors] = React.useState<AppColors>({
+    backgroundColorMain: 'rgba(227, 228, 231, 1)',
+    bottomMenuBackground: 'rgba(253, 253, 255, 1)',
+    textColor: 'rgba(0, 0, 0, 1)',
+    buttonColor: 'rgba(217, 217, 217, 1)',
+  });
+  const [safeInsets, setSafeInsets] = React.useState<Insets>({
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  });
+
   const activeButton = appStore(state => state.activeButton);
-  const setActiveFilter = appStore(state => state.setActiveFilter);
   const buttonsOpen = activeButton !== null;
-  const filtertoShowInitial = FILTERS.filter(f => f.key === 'none');
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-
-    let files = Array.from(e.target.files);
-    const allowed = [
-      'image/jpeg',
-      'image/png',
-      'image/webp',
-      'image/jpg',
-      'image/gif',
-      'image/bitmap',
-      'video/mp4',
-      'video/webm',
-      'video/ogg',
-      'video/mkv',
-      'video/avi',
-      'video/mov',
-      'video/mpeg',
-      'video/quicktime',
-    ];
-
-    // ✅ Filter valid files
-    let valid = files.filter(
-      f => allowed.includes(f.type) && f.size <= 2000 * 1024 * 1024,
-    );
-
-    // ✅ Enforce single file if post === false
-    if (!post && valid.length > 1) {
-      alert('Only one file allowed in this mode.');
-      valid = valid.slice(0, 1);
-    }
-
-    if (post && valid.length > 15) {
-      alert('Max 15 files allowed.');
-      return;
-    }
-    // temporary will be removed later
-    if (post) {
-      valid = valid.reverse();
-    }
-    setMediaFiles(valid);
-  };
-
-  // set the first filter to show
+  // ✅ Setup logging and global error handling
   useEffect(() => {
-    if (!mediaFiles.length) {
-      setActiveFilter(filtertoShowInitial[0]);
+    rnLogger.info('🚀 Media Filter App initializing...');
+
+    const restoreConsole = setupConsoleInterception();
+    setupGlobalErrorHandling();
+
+    return () => {
+      rnLogger.info('📱 Media Filter App cleaning up...');
+      restoreConsole();
+    };
+  }, []);
+
+  // ✅ Mock: simulate RN sending files in browser
+  // useEffect(() => {
+  //   const mockMedia: MediaFile[] = [
+  //     {
+  //       id: '1',
+  //       uri: VideoSRC,
+  //       filename: 'sample',
+  //       mediaType: 'video',
+  //       width: 1080,
+  //       height: 1920,
+  //     },
+  //     {
+  //       id: '2',
+  //       uri: SRC2,
+  //       filename: 'sample2',
+  //       mediaType: 'photo',
+  //       width: 1080,
+  //       height: 1080,
+  //     },
+  //     {
+  //       id: '3',
+  //       uri: VideoSRC2,
+  //       filename: 'sample2',
+  //       mediaType: 'video',
+  //       width: 1080,
+  //       height: 1080,
+  //     },
+  //   ];
+
+  //   (window as any).__EXPO_MEDIA__ = {
+  //     file: mockMedia,
+  //     post: true,
+  //     insets: {
+  //       top: 0,
+  //       bottom: 16,
+  //       left: 0,
+  //       right: 0,
+  //     },
+  //   };
+
+  //   // simulate RN dispatch
+  //   window.dispatchEvent(new Event('mediaReady'));
+  // }, []);
+
+  useEffect(() => {
+    const listener = async () => {
+      const data: HydrationPayload = (window as any).__EXPO_MEDIA__;
+      if (!data) {
+        rnLogger.log('⚠️ No __EXPO_MEDIA__ found on window');
+        return;
+      }
+      const payload = trimBase64({files: data.file});
+      rnLogger.log('📥 Processing injected HYDRATE', payload);
+      await applyHydrationData(data, 'Injection', setMediaFiles, setPost);
+      setSafeInsets(data.insets);
+
+      // Notify RN that web is ready
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({type: 'WEB_READY'}),
+        );
+      }
+    };
+
+    window.addEventListener('mediaReady', listener);
+
+    // Also try to run immediately in case the event already fired
+    listener();
+
+    return () => {
+      window.removeEventListener('mediaReady', listener);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Handle messages from RN
+    const handleDocumentMessage = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data);
+        rnLogger.log('📨 Received message via document:', msg.type);
+
+        if (msg.type === 'PATCH_STATE') {
+          rnLogger.log('🎨 PATCH_STATE update (document):', msg.payload);
+          const data: PatchPayload = msg.payload;
+          if (data.requestedExport === true) {
+            setRequestedExport(true);
+          }
+          if (data.appColors !== undefined) {
+            setAppColors(data.appColors);
+          }
+        }
+        if (msg.type === 'EXPORT_DATA_RECEIVED') {
+          setRequestedExport(false);
+        }
+        if (msg.type === 'SAVE_DATA_RECEIVED') {
+          setRequestedSave(false);
+        }
+      } catch (err) {
+        rnLogger.error('⚠️ Bad message from RN via document:', event.data, err);
+      }
+    };
+
+    document.addEventListener('message', handleDocumentMessage as any);
+
+    rnLogger.log('🎧 Message listeners set up on document');
+
+    return () => {
+      document.removeEventListener('message', handleDocumentMessage as any);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    rnLogger.log('🎨 Active filter changed:', activeFilter);
+  }, [activeFilter]);
+
+  useEffect(() => {
+    if (requestedSave || requestedExport) {
+      const payload = normalizeForExport({
+        activeFilter,
+        currentEditorValues,
+        currentStoreAdjust,
+      });
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({
+            type: 'CURRENT_ACTIVE_VALUES',
+            payload: {
+              save: requestedSave,
+              ...payload,
+            },
+          }),
+        );
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaFiles, filtertoShowInitial]);
+  }, [requestedSave, requestedExport]);
+
+  useEffect(() => {
+    if (activeButton === 'adjust' || tagMode) {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({
+            type: 'ADJUST_MENUS_OPEN',
+            payload: {},
+          }),
+        );
+      }
+    } else {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({
+            type: 'MENUS_CLOSE',
+            payload: {},
+          }),
+        );
+      }
+    }
+  }, [activeButton, tagMode]);
+
+  useEffect(() => {
+    if (!mediaFiles.length) {
+      setInitializing(true);
+    } else {
+      setInitializing(false);
+    }
+  }, [mediaFiles]);
+
+  // Early return for loading state - kept as is
+  if (isInitializing) {
+    return (
+      <div
+        className="flex h-screen w-screen items-center justify-center"
+        style={{backgroundColor: appColors.backgroundColorMain}}>
+        <ClipLoader
+          size={40}
+          color="#FF4800"
+          cssOverride={{borderWidth: '3.5px'}}
+        />
+      </div>
+    );
+  }
 
   return (
-    <main className="flex h-screen w-screen items-center justify-center bg-black text-white">
-      {/* This section will be removed when migrating to react native web view integration*/}
-      {!mediaFiles.length ? (
-        <div className="p-4 text-center">
-          <label className="cursor-pointer rounded bg-blue-600 px-4 py-2 text-white">
-            Upload Media
-            <input
-              type="file"
-              accept="image/*,video/*"
-              multiple={post}
-              hidden
-              onChange={handleUpload}
-            />
-          </label>
-        </div>
-      ) : (
-        <div className="mx-auto flex h-full max-w-md flex-1 flex-col bg-gray-900">
-          <TopBar />
-          <MediaCanvas post={post} />
-          {!buttonsOpen && <BottomBar />}
-          {buttonsOpen && activeButton === 'filter' && <FilterMenu />}
-          {buttonsOpen && activeButton === 'sticker' && <StickerMenu />}
-          {buttonsOpen && activeButton === 'audio' && <AudioMenu />}
-          {buttonsOpen && activeButton === 'editor' && <EditorMenu />}
-          {buttonsOpen && activeButton === 'text' && <TextMenu />}
-        </div>
-      )}
+    <main
+      className={`flex h-screen w-screen items-center justify-center`}
+      style={{backgroundColor: appColors.backgroundColorMain}}>
+      <div
+        className={`relative mx-auto flex h-full max-w-full flex-1 flex-col`}>
+        <MediaComponent post={post} />
+        {!buttonsOpen && (
+          <BottomBar
+            post={post}
+            appColors={appColors}
+            safeInsets={safeInsets}
+          />
+        )}
+        {buttonsOpen && activeButton === 'filter' && (
+          <FilterMenu appColors={appColors} safeInsets={safeInsets} />
+        )}
+        {buttonsOpen && activeButton === 'sticker' && (
+          <StickerMenu appColors={appColors} safeInsets={safeInsets} />
+        )}
+        {buttonsOpen && activeButton === 'audio' && (
+          <AudioMenu appColors={appColors} safeInsets={safeInsets} />
+        )}
+        {buttonsOpen && activeButton === 'editor' && (
+          <EditorMenu appColors={appColors} safeInsets={safeInsets} />
+        )}
+        {buttonsOpen && activeButton === 'text' && (
+          <TextMenu appColors={appColors} safeInsets={safeInsets} />
+        )}
+        {buttonsOpen && activeButton === 'editorMainMenu' && (
+          <EditorMenuMain appColors={appColors} safeInsets={safeInsets} />
+        )}
+        {((buttonsOpen && activeButton === 'adjust') || tagMode) && (
+          <AdjustMenu post={post} safeInsets={safeInsets} />
+        )}
+      </div>
     </main>
   );
 };

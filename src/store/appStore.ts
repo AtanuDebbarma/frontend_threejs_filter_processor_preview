@@ -1,16 +1,16 @@
 import {create} from 'zustand';
 import {immer} from 'zustand/middleware/immer';
 import {createFileSlice, type FileSliceType} from './fileSlice';
-import {type ButtonSliceType, createButtonSlice} from './buttonSlices';
-import {type FilterSliceType, createFilterSlice} from './filterSlice';
+import {createButtonSlice, type ButtonSliceType} from './buttonSlices';
+import {createFilterSlice, type FilterSliceType} from './filterSlice';
 import {createEditorSlice, type EditorState} from './editorSlice';
-import {createTextSlice, type TextSliceType} from './textSlice';
+import {createAdjustSlice, type AdjustState} from './adjustSlice';
 
 export type AppState = FileSliceType &
   ButtonSliceType &
   FilterSliceType &
   EditorState &
-  TextSliceType;
+  AdjustState;
 
 export const appStore = create<AppState>()(
   immer((...store) => ({
@@ -18,6 +18,6 @@ export const appStore = create<AppState>()(
     ...createButtonSlice(...store),
     ...createFilterSlice(...store),
     ...createEditorSlice(...store),
-    ...createTextSlice(...store),
+    ...createAdjustSlice(...store),
   })),
 );
