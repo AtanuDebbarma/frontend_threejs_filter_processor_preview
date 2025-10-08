@@ -56,6 +56,7 @@ const App = (): React.JSX.Element => {
   const requestedSave = appStore(state => state.requestedSave);
   const setRequestedSave = appStore(state => state.setRequestedSave);
   const setRequestedExport = appStore(state => state.setRequestedExport);
+  const setIsModalOpen = appStore(state => state.setIsModalOpen);
   const tagMode = appStore(state => state.tagMode);
   const currentEditorValues: EditorRecord = appStore(
     state => state.editorByIndex,
@@ -174,32 +175,52 @@ const App = (): React.JSX.Element => {
     const handleDocumentMessage = (event: MessageEvent) => {
       try {
         const msg = JSON.parse(event.data);
+        if (!msg?.type) {
+          rnLogger.warn('⚠️ Unknown message format:', msg);
+          return;
+        }
+
         rnLogger.log('📨 Received message via document:', msg.type);
 
-        if (msg.type === 'PATCH_STATE') {
-          rnLogger.log('🎨 PATCH_STATE update (document):', msg.payload);
-          const data: PatchPayload = msg.payload;
-          if (data.requestedExport === true) {
-            setRequestedExport(true);
+        switch (msg.type) {
+          case 'PATCH_STATE': {
+            const data: PatchPayload = msg.payload;
+            rnLogger.log('🎨 PATCH_STATE update:', data);
+            if (data.requestedExport) setRequestedExport(true);
+            if (data.appColors) setAppColors(data.appColors);
+            break;
           }
-          if (data.appColors !== undefined) {
-            setAppColors(data.appColors);
+
+          case 'MODAL_STATE_CHANGE': {
+            const {modalOpen} = msg.payload || {};
+            setIsModalOpen(!!modalOpen);
+            rnLogger.log('🎨 Modal state changed:', modalOpen);
+            break;
           }
-        }
-        if (msg.type === 'EXPORT_DATA_RECEIVED') {
-          setRequestedExport(false);
-        }
-        if (msg.type === 'SAVE_DATA_RECEIVED') {
-          setRequestedSave(false);
+
+          case 'EXPORT_DATA_RECEIVED': {
+            rnLogger.log('✅ Export data received');
+            setRequestedExport(false);
+            break;
+          }
+
+          case 'SAVE_DATA_RECEIVED': {
+            rnLogger.log('✅ Save data received');
+            setRequestedSave(false);
+            break;
+          }
+
+          default:
+            rnLogger.warn('⚠️ Unhandled message type:', msg.type);
+            break;
         }
       } catch (err) {
-        rnLogger.error('⚠️ Bad message from RN via document:', event.data, err);
+        rnLogger.error('❌ Bad message from RN via document:', event.data, err);
       }
     };
 
     document.addEventListener('message', handleDocumentMessage as any);
-
-    rnLogger.log('🎧 Message listeners set up on document');
+    rnLogger.log('🎧 Message listener set up on document');
 
     return () => {
       document.removeEventListener('message', handleDocumentMessage as any);
@@ -212,46 +233,58 @@ const App = (): React.JSX.Element => {
   }, [activeFilter]);
 
   useEffect(() => {
-    if (requestedSave || requestedExport) {
-      const payload = normalizeForExport({
-        activeFilter,
-        currentEditorValues,
-        currentStoreAdjust,
-      });
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            type: 'CURRENT_ACTIVE_VALUES',
-            payload: {
-              save: requestedSave,
-              ...payload,
-            },
-          }),
+    try {
+      if (requestedSave || requestedExport) {
+        const payload = normalizeForExport({
+          activeFilter,
+          currentEditorValues,
+          currentStoreAdjust,
+        });
+        rnLogger.log(
+          '🎨 Sending current active values to RN:',
+          JSON.stringify(payload, null, 2),
         );
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(
+            JSON.stringify({
+              type: 'CURRENT_ACTIVE_VALUES',
+              payload: {
+                save: requestedSave,
+                ...payload,
+              },
+            }),
+          );
+        }
       }
+    } catch (error) {
+      rnLogger.error('Failed to send current active values to RN:', error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedSave, requestedExport]);
 
   useEffect(() => {
-    if (activeButton === 'adjust' || tagMode) {
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            type: 'ADJUST_MENUS_OPEN',
-            payload: {},
-          }),
-        );
+    try {
+      if (activeButton === 'adjust' || tagMode) {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(
+            JSON.stringify({
+              type: 'ADJUST_MENUS_OPEN',
+              payload: {},
+            }),
+          );
+        }
+      } else {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(
+            JSON.stringify({
+              type: 'MENUS_CLOSE',
+              payload: {},
+            }),
+          );
+        }
       }
-    } else {
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            type: 'MENUS_CLOSE',
-            payload: {},
-          }),
-        );
-      }
+    } catch (error) {
+      rnLogger.error('Failed to open adjust menus:', error);
     }
   }, [activeButton, tagMode]);
 

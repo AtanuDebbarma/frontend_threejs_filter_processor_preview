@@ -42,6 +42,9 @@ export type AdjustState = {
   tagMode: boolean;
   setTagMode: (mode: boolean) => void;
 
+  isModalOpen: boolean;
+  setIsModalOpen: (open: boolean) => void;
+
   tagValuesByIndex: Record<number, {id: string; tags: TagPoint[]}>;
   addTagToIndex: (index: number, id: string, tag: TagPoint) => void;
   updateTagAtIndex: (
@@ -79,6 +82,12 @@ export const createAdjustSlice: StateCreator<
   tagMode: false,
   tagValuesByIndex: {},
 
+  isModalOpen: false,
+  setIsModalOpen: open =>
+    set(state => {
+      state.isModalOpen = open;
+    }),
+
   setTagMode: mode =>
     set(state => {
       state.tagMode = mode;
@@ -115,18 +124,33 @@ export const createAdjustSlice: StateCreator<
     set(state => {
       const record = state.tagValuesByIndex[index];
       if (!record) return;
-      record.id = id;
-      record.tags = record.tags.map(t =>
-        t.id === tagId ? {...t, ...patch} : t,
-      );
+
+      const updatedRecord = {
+        id,
+        tags: record.tags.map(t => (t.id === tagId ? {...t, ...patch} : t)),
+      };
+
+      state.tagValuesByIndex = {
+        ...state.tagValuesByIndex,
+        [index]: updatedRecord,
+      };
     }),
 
   removeTagAtIndex: (index, id, tagId) =>
     set(state => {
       const record = state.tagValuesByIndex[index];
       if (!record) return;
-      record.id = id;
-      record.tags = record.tags.filter(t => t.id !== tagId);
+
+      const updatedRecord = {
+        id,
+        tags: record.tags.filter(t => t.id !== tagId),
+      };
+
+      // ✅ Replace the whole entry
+      state.tagValuesByIndex = {
+        ...state.tagValuesByIndex,
+        [index]: updatedRecord,
+      };
     }),
 
   clearTagsAtIndex: (index, id) =>

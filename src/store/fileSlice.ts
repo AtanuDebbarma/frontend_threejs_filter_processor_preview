@@ -31,6 +31,14 @@ export const createFileSlice: StateCreator<
   requestedExport: false,
   requestedSave: false,
 
+  /**
+   * Adds new media files to the current list of files.
+   * If the incoming parameter is an array, it is spread into the list.
+   * If the incoming parameter is a single file, it is added to the list.
+   * For each new file, the editor and adjust slices are also initialized with default values.
+   * The tags slice is also initialized with an empty array.
+   * @param files A single media file or an array of media files to add.
+   */
   setMediaFiles: (files: MediaFile[]) =>
     set(state => {
       state.mediaFiles = files;

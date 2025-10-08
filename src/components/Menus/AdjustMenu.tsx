@@ -36,6 +36,7 @@ export const AdjustMenu = ({
   const removeTagAtIndex = appStore(state => state.removeTagAtIndex);
   const currentActiveId: string = mediaFiles[activeIndex]?.id;
   const adjustByIndex: AdjustRecord = appStore(state => state.adjustByIndex);
+  const isModalOpen = appStore(state => state.isModalOpen);
 
   const currentStoreAdjust =
     adjustByIndex[activeIndex].value ?? defaultAdjustTransform;
@@ -176,12 +177,17 @@ export const AdjustMenu = ({
           rnLogger.componentLog(
             'AdjustMenu',
             'log',
-            `Tag search result payload: ${data.payload}`,
+            `Tag search result payload: ${JSON.stringify(
+              data.payload,
+              null,
+              2,
+            )}`,
           );
 
           // If tag search was cancelled or invalid — remove it
           if (!userId || !username) {
             removeTagAtIndex(activeIndex, currentActiveId, tagId);
+            handleManualCancel(assetId, tagId);
             return;
           }
 
@@ -233,62 +239,67 @@ export const AdjustMenu = ({
             setRotation(a);
           }
         : undefined,
-      onClick: tagMode
-        ? ({event}) => {
-            if (!previewRef.current || isTagSelectionLocked) return;
+      onClick:
+        tagMode && !isModalOpen
+          ? ({event}) => {
+              if (!previewRef.current || isTagSelectionLocked) return;
 
-            // Lock tag selection for 200ms
-            setIsTagSelectionLocked(true);
-            if (tagSelectionTimeoutRef.current) {
-              clearTimeout(tagSelectionTimeoutRef.current);
-            }
-            tagSelectionTimeoutRef.current = setTimeout(() => {
-              setIsTagSelectionLocked(false);
-            }, 300);
+              // ✅ Double check modal isn't open
+              if (isModalOpen) return;
 
-            const e = event as MouseEvent;
-            const containerRect = previewRef.current.getBoundingClientRect();
-            const x = (e.clientX - containerRect.left) / containerRect.width;
-            const y = (e.clientY - containerRect.top) / containerRect.height;
+              // Lock tag selection for 200ms
+              setIsTagSelectionLocked(true);
+              if (tagSelectionTimeoutRef.current) {
+                clearTimeout(tagSelectionTimeoutRef.current);
+              }
+              tagSelectionTimeoutRef.current = setTimeout(() => {
+                setIsTagSelectionLocked(false);
+              }, 300);
 
-            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
-              const tagId = Date.now();
-              // Find the current max z among tags for this index
-              const existingTags = tagValuesByIndex[activeIndex] || [];
-              const maxZ =
-                existingTags.tags.length && existingTags.id === currentActiveId
-                  ? Math.max(...existingTags.tags.map(t => t.z ?? 0))
-                  : 0;
-              const zIndex = maxZ + 1; // ✅ define z here
+              const e = event as MouseEvent;
+              const containerRect = previewRef.current.getBoundingClientRect();
+              const x = (e.clientX - containerRect.left) / containerRect.width;
+              const y = (e.clientY - containerRect.top) / containerRect.height;
 
-              addTagToIndex(activeIndex, currentActiveId, {
-                id: tagId,
-                x: x,
-                y: y,
-                z: zIndex, // to be fixed
-                username: '',
-                userId: '',
-              });
+              if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+                const tagId = Date.now();
+                // Find the current max z among tags for this index
+                const existingTags = tagValuesByIndex[activeIndex] || [];
+                const maxZ =
+                  existingTags.tags.length &&
+                  existingTags.id === currentActiveId
+                    ? Math.max(...existingTags.tags.map(t => t.z ?? 0))
+                    : 0;
+                const zIndex = maxZ + 1; // ✅ define z here
 
-              // Send message to React Native
-              if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(
-                  JSON.stringify({
-                    type: 'TAG_SEARCH',
-                    payload: {
-                      tagId,
-                      x,
-                      y,
-                      zIndex: zIndex,
-                      mediaIndex: activeIndex,
-                      mediaID: currentActiveId,
-                    },
-                  }),
-                );
+                addTagToIndex(activeIndex, currentActiveId, {
+                  id: tagId,
+                  x: x,
+                  y: y,
+                  z: zIndex, // to be fixed
+                  username: '',
+                  userId: '',
+                });
+
+                // Send message to React Native
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(
+                    JSON.stringify({
+                      type: 'TAG_SEARCH',
+                      payload: {
+                        tagId,
+                        x,
+                        y,
+                        zIndex: zIndex,
+                        mediaIndex: activeIndex,
+                        mediaID: currentActiveId,
+                      },
+                    }),
+                  );
+                }
               }
             }
-          }
-        : undefined,
+          : undefined,
     },
     {
       target: imgRef,
