@@ -55,20 +55,23 @@ export const getVideoThumbnail = async (
       video.onerror = () => reject(new Error('Error loading video metadata'));
     });
 
-    // Safe seek (avoid exactly duration)
+    // Safe seek
     const safeSeek = Math.min(seekTo, video.duration || seekTo);
     video.currentTime = Math.min(
       safeSeek,
       Math.max(0, (video.duration || safeSeek) - 0.001),
     );
 
-    // Wait for seek
+    // Wait for frame to be decoded
     await new Promise<void>((resolve, reject) => {
-      video.onseeked = () => resolve();
+      video.onseeked = () => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, 100);
+        });
+      };
       video.onerror = () => reject(new Error('Error seeking video'));
     });
-
-    // Draw frame
+    // Draw frame to canvas
     const scale = Math.min(maxWidth / video.videoWidth, 1);
     canvas.width = Math.floor(video.videoWidth * scale);
     canvas.height = Math.floor(video.videoHeight * scale);
