@@ -76,3 +76,32 @@ export const applyHydrationData = async (
   setMediaFiles(data.file ?? []);
   setPost(data.post);
 };
+
+export function computeCoverFit(
+  mediaW: number,
+  mediaH: number,
+  containerW: number,
+  containerH: number,
+) {
+  const mediaAspect = mediaW / mediaH;
+  const containerAspect = containerW / containerH;
+
+  let renderW,
+    renderH,
+    offsetX = 0,
+    offsetY = 0;
+
+  if (mediaAspect > containerAspect) {
+    // media is wider → crop horizontally
+    renderH = containerH;
+    renderW = renderH * mediaAspect;
+    offsetX = (renderW - containerW) / 2;
+  } else {
+    // media is taller → crop vertically
+    renderW = containerW;
+    renderH = renderW / mediaAspect;
+    offsetY = (renderH - containerH) / 2;
+  }
+
+  return {renderW, renderH, offsetX, offsetY};
+}

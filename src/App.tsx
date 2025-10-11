@@ -6,6 +6,7 @@ import MediaComponent from './components/Filters_And_MediaOutput/MediaComponent'
 // import VideoSRC from './assets/test.mp4';
 // import VideoSRC2 from './assets/ufc.mp4';
 // import SRC2 from './assets/test.jpg';
+// import VideoSRC3 from './assets/test2.mp4';
 import {
   rnLogger,
   setupConsoleInterception,
@@ -57,6 +58,7 @@ const App = (): React.JSX.Element => {
   const setRequestedSave = appStore(state => state.setRequestedSave);
   const setRequestedExport = appStore(state => state.setRequestedExport);
   const setIsModalOpen = appStore(state => state.setIsModalOpen);
+  const videoMutedState = appStore.getState().videoMutedState;
   const tagMode = appStore(state => state.tagMode);
   const currentEditorValues: EditorRecord = appStore(
     state => state.editorByIndex,
@@ -121,6 +123,14 @@ const App = (): React.JSX.Element => {
   //       mediaType: 'video',
   //       width: 1080,
   //       height: 1080,
+  //     },
+  //     {
+  //       id: '4',
+  //       uri: VideoSRC3,
+  //       filename: 'sample3',
+  //       mediaType: 'video',
+  //       width: 1080,
+  //       height: 1920,
   //     },
   //   ];
 
@@ -205,8 +215,9 @@ const App = (): React.JSX.Element => {
           }
 
           case 'SAVE_DATA_RECEIVED': {
+            const {id, active} = msg.payload || {};
             rnLogger.log('✅ Save data received');
-            setRequestedSave(false);
+            setRequestedSave(id, active);
             break;
           }
 
@@ -234,23 +245,43 @@ const App = (): React.JSX.Element => {
 
   useEffect(() => {
     try {
-      if (requestedSave || requestedExport) {
+      if (requestedSave.active || requestedExport) {
         const payload = normalizeForExport({
           activeFilter,
           currentEditorValues,
           currentStoreAdjust,
+          videoMutedState,
+          mediaFiles,
         });
+
+        let filteredPayload = payload;
+
+        // 🎯 Save only one file
+        if (requestedSave.active && requestedSave.id) {
+          filteredPayload = {
+            filter: payload.filter,
+            files: payload.files.filter(f => f?.id === requestedSave.id),
+          };
+        }
+
         rnLogger.log(
           '🎨 Sending current active values to RN:',
-          JSON.stringify(payload, null, 2),
+          JSON.stringify(filteredPayload, null, 2),
         );
+
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(
             JSON.stringify({
               type: 'CURRENT_ACTIVE_VALUES',
               payload: {
-                save: requestedSave,
-                ...payload,
+                post: post,
+                save: requestedSave.active
+                  ? {
+                      active: requestedSave.active || false,
+                      id: requestedSave.id || null,
+                    }
+                  : null,
+                ...filteredPayload,
               },
             }),
           );

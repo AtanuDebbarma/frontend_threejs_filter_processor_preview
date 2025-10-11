@@ -4,6 +4,10 @@ import type {MediaFile} from '../types/filterTypes';
 import {defaultEditor} from './editorSlice';
 import {defaultAdjustTransform} from './adjustSlice';
 
+export type RequestedSave = {
+  id: string | null; // which media file to save
+  active: boolean; // trigger flag
+};
 export type FileSliceType = {
   mediaFiles: MediaFile[];
   activeIndex: number;
@@ -14,8 +18,10 @@ export type FileSliceType = {
   resetCache: () => void;
   requestedExport: boolean;
   setRequestedExport: (requested: boolean) => void;
-  requestedSave: boolean;
-  setRequestedSave: (requested: boolean) => void;
+  requestedSave: RequestedSave;
+  setRequestedSave: (id: string | null, active: boolean) => void;
+  videoMutedState: Record<number, {id: string; muted: boolean}>;
+  setVideoMutedState: (index: number, id: string, muted: boolean) => void;
 };
 
 export const createFileSlice: StateCreator<
@@ -25,24 +31,19 @@ export const createFileSlice: StateCreator<
   FileSliceType
 > = (set, get) => ({
   mediaFiles: [],
-  videoThumbnailButton: undefined,
   activeIndex: 0,
   thumbCache: new Map(),
   requestedExport: false,
-  requestedSave: false,
+  videoMutedState: {},
 
   /**
-   * Adds new media files to the current list of files.
-   * If the incoming parameter is an array, it is spread into the list.
-   * If the incoming parameter is a single file, it is added to the list.
-   * For each new file, the editor and adjust slices are also initialized with default values.
-   * The tags slice is also initialized with an empty array.
-   * @param files A single media file or an array of media files to add.
+   * Initialize media files and related slice states.
    */
   setMediaFiles: (files: MediaFile[]) =>
     set(state => {
       state.mediaFiles = files;
-      // Initialize editors & adjust slices immediately with IDs
+
+      // Initialize related slices (editor, adjust, tag)
       files.forEach((file, index) => {
         state.editorByIndex[index] = {
           id: file.id,
@@ -54,6 +55,15 @@ export const createFileSlice: StateCreator<
         };
         state.tagValuesByIndex[index] = {id: file.id, tags: []};
       });
+
+      // ✅ Initialize videoMutedState for all video files
+      const newMutedState: Record<number, {id: string; muted: boolean}> = {};
+      files.forEach((file, index) => {
+        if (file.mediaType === 'video') {
+          newMutedState[index] = {id: file.id, muted: false};
+        }
+      });
+      state.videoMutedState = newMutedState;
     }),
 
   setActiveIndex: (index: number) =>
@@ -74,9 +84,14 @@ export const createFileSlice: StateCreator<
       state.requestedExport = requested;
     });
   },
-  setRequestedSave: (requested: boolean) => {
+  requestedSave: {id: null, active: false},
+  setRequestedSave: (id: string | null, active: boolean) =>
     set(state => {
-      state.requestedSave = requested;
-    });
-  },
+      state.requestedSave = {id, active};
+    }),
+
+  setVideoMutedState: (index, id, muted) =>
+    set(state => {
+      state.videoMutedState[index] = {id, muted};
+    }),
 });

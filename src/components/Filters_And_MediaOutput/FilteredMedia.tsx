@@ -23,6 +23,7 @@ type Props = {
   handleTap?: () => void;
   muted?: boolean;
   index: number;
+  post?: boolean;
 };
 
 export const FilteredMedia = (props: Props): React.JSX.Element => {
@@ -992,7 +993,9 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   const safeMediaPixelW = Math.max(1, mediaPixelW);
   const safeMediaPixelH = Math.max(1, mediaPixelH);
 
-  const worldPerPixel = viewport.width / Math.max(1, size.width);
+  const worldPerPixel = viewport.width / size.width;
+  const worldW = (props.originalWidth ?? safeMediaPixelW) * worldPerPixel;
+  const worldH = (props.originalHeight ?? safeMediaPixelH) * worldPerPixel;
 
   const scaleFactor =
     resolvedFit === 'contain'
@@ -1005,11 +1008,12 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
           containerPixelH / safeMediaPixelH,
         );
 
-  const desiredWorldW = safeMediaPixelW * scaleFactor * worldPerPixel;
-  const desiredWorldH = safeMediaPixelH * scaleFactor * worldPerPixel;
+  const worldWScaled = worldW * scaleFactor;
+  const worldHScaled = worldH * scaleFactor;
 
-  const scaleX = desiredWorldW;
-  const scaleY = desiredWorldH;
+  // Apply adjustTransform.x/y normalized offsets relative to that
+  const posX = (adjustTransform?.x ?? 0) * worldWScaled;
+  const posY = -(adjustTransform?.y ?? 0) * worldHScaled;
 
   if (!currentSelectedID) {
     return <></>;
@@ -1019,17 +1023,13 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   return (
     <mesh
       ref={meshRef}
+      position={[posX, posY, 0]}
       scale={[
-        scaleX * (adjustTransform?.scale ?? 1),
-        scaleY * (adjustTransform?.scale ?? 1),
+        worldWScaled * (adjustTransform?.scale ?? 1),
+        worldHScaled * (adjustTransform?.scale ?? 1),
         1,
       ]}
       rotation={[0, 0, (adjustTransform?.rotation ?? 0) * (Math.PI / 180)]}
-      position={[
-        (adjustTransform?.x ?? 0) * viewport.width,
-        -(adjustTransform?.y ?? 0) * viewport.height, // Y inverted so dragging feels natural
-        0,
-      ]}
       onClick={props.handleTap}>
       <planeGeometry args={[1, 1]} />
       <primitive object={material} attach="material" />

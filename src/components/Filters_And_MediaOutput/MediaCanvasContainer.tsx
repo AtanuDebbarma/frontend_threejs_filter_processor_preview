@@ -31,6 +31,8 @@ export const MediaCanvasContainer = ({
   const setActiveIndex = appStore(state => state.setActiveIndex);
   const buttonsOpen = useMemo(() => activeButton !== null, [activeButton]);
   const setTagMode = appStore(state => state.setTagMode);
+  const globalMutedState = appStore(state => state.videoMutedState);
+  const setVideoMutedState = appStore(state => state.setVideoMutedState);
 
   const [initialized, setInitialized] = useState(false);
   const [aspectType, setAspectType] = useState<
@@ -115,6 +117,16 @@ export const MediaCanvasContainer = ({
     },
     [],
   );
+
+  useEffect(() => {
+    const initialMutedMap: Record<number, boolean> = {};
+
+    Object.entries(globalMutedState).forEach(([idx, {muted}]) => {
+      initialMutedMap[Number(idx)] = muted;
+    });
+
+    setMutedMap(initialMutedMap);
+  }, [globalMutedState]);
 
   // UPDATED: toggle play/pause with timeout (like RN code)
   const togglePlayForIndex = useCallback(
@@ -250,20 +262,26 @@ export const MediaCanvasContainer = ({
       const vid = ref.current;
       if (!vid) return;
 
-      // Clear existing timeout
       if (muteTimeoutRefs.current[index]) {
         clearTimeout(muteTimeoutRefs.current[index]!);
       }
 
       const willMute = !vid.muted;
+      const media = mediaList[index];
+      if (!media) return;
+      if (vid.muted === willMute) return;
 
-      // Execute mute after delay (like RN: 180ms)
       muteTimeoutRefs.current[index] = setTimeout(() => {
         vid.muted = willMute;
+
+        // Update local state
         setMutedMap(mm => ({...mm, [index]: vid.muted}));
+
+        // Update global Zustand state
+        setVideoMutedState(index, media.id, vid.muted);
       }, 180);
     },
-    [getVideoRef],
+    [getVideoRef, setVideoMutedState, mediaList],
   );
 
   // attach mute state listeners when refs are available
@@ -275,13 +293,16 @@ export const MediaCanvasContainer = ({
       const vid = ref?.current;
       if (!vid) return;
 
-      const onVolumeChange = () =>
+      const onVolumeChange = () => {
         setMutedMap(mm => ({...mm, [idx]: vid.muted}));
+        setVideoMutedState(idx, mediaList[idx].id, vid.muted);
+      };
 
       vid.removeEventListener('volumechange', onVolumeChange);
       vid.addEventListener('volumechange', onVolumeChange);
     });
-  }, [mediaList]);
+  }, [mediaList, setVideoMutedState]);
+
   const {activeIndex, setItemRef} = useActiveMediaIndex<HTMLDivElement>();
   // Pause non-active videos when activeIndex changes
   useEffect(() => {

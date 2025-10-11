@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {appStore} from '../../store/appStore';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {
@@ -18,8 +18,14 @@ export const EditorMenuMain = ({
   appColors,
   safeInsets,
 }: Props): React.JSX.Element => {
+  const mediaFiles = appStore(state => state.mediaFiles);
+  const activeIndex = appStore(state => state.activeIndex);
   const setActiveButton = appStore(state => state.setActiveButton);
   const setRequestedSave = appStore(state => state.setRequestedSave);
+
+  const currentID = useMemo(() => {
+    return mediaFiles[activeIndex]?.id;
+  }, [activeIndex, mediaFiles]);
 
   const handleButtonToggle = (
     button: 'adjust' | 'text' | 'audio' | 'editor',
@@ -33,7 +39,7 @@ export const EditorMenuMain = ({
   const handleSave = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setTimeout(() => {
-      setRequestedSave(true);
+      setRequestedSave(currentID, true);
     }, 200);
   };
 
