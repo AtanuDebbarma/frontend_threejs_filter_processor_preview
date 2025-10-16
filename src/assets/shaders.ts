@@ -10,7 +10,7 @@ export const vertexShader = `
 
 export const fragmentShader = `
 // ✅ fragment shader — webview + browser friendly, blur in linear space
-precision mediump float;
+precision highp float;
 
 uniform sampler2D tDiffuse;
 uniform vec2 u_texel;            // <-- (1.0 / textureWidth, 1.0 / textureHeight)

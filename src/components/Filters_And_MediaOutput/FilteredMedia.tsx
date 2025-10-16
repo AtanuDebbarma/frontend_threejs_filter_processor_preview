@@ -81,9 +81,44 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   // set DPR
   useEffect(() => {
     if (!gl) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    gl.setPixelRatio(dpr);
+    const storeDpr = appStore.getState().dpr || window.devicePixelRatio || 1;
+    gl.setPixelRatio(storeDpr);
+    rnLogger.componentLog(
+      'FilteredMedia',
+      'log',
+      `DPR check → Web: ${window.devicePixelRatio}, RN: ${appStore.getState().dpr}, GL: ${gl.getPixelRatio()}`,
+    );
   }, [gl]);
+
+  useEffect(() => {
+    if (!gl) return;
+    try {
+      const glctx = gl.getContext ? gl.getContext() : gl;
+
+      // ✅ covers both WebGL1 and WebGL2
+      if (
+        typeof glctx === 'object' &&
+        (glctx instanceof WebGLRenderingContext ||
+          glctx instanceof WebGL2RenderingContext)
+      ) {
+        glctx.pixelStorei(glctx.UNPACK_COLORSPACE_CONVERSION_WEBGL, glctx.NONE);
+        glctx.pixelStorei(glctx.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      }
+
+      rnLogger.componentLog(
+        'FilteredMedia',
+        'log',
+        'Disabled automatic colorspace conversion and premultiplied alpha on WebGL context.',
+      );
+    } catch (err) {
+      rnLogger.componentLog(
+        'FilteredMedia',
+        'warn',
+        `Failed to set pixelStorei flags: ${err}`,
+      );
+    }
+  }, [gl]);
+
   useEffect(() => {
     const trimmedUri = trimBase64({singleFile: props.uri});
     rnLogger.componentLog(
@@ -993,7 +1028,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   const safeMediaPixelW = Math.max(1, mediaPixelW);
   const safeMediaPixelH = Math.max(1, mediaPixelH);
 
-  const worldPerPixel = viewport.width / size.width;
+  const worldPerPixel = viewport.width / Math.max(1, size.width);
   const worldW = (props.originalWidth ?? safeMediaPixelW) * worldPerPixel;
   const worldH = (props.originalHeight ?? safeMediaPixelH) * worldPerPixel;
 
@@ -1029,7 +1064,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         worldHScaled * (adjustTransform?.scale ?? 1),
         1,
       ]}
-      rotation={[0, 0, (adjustTransform?.rotation ?? 0) * (Math.PI / 180)]}
+      rotation={[0, 0, -(adjustTransform?.rotation ?? 0) * (Math.PI / 180)]}
       onClick={props.handleTap}>
       <planeGeometry args={[1, 1]} />
       <primitive object={material} attach="material" />

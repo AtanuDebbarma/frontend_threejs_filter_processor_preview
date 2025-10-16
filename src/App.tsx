@@ -29,6 +29,8 @@ import {normalizeForExport} from './helpers/exportHelpers';
 export type HydrationPayload = {
   file: MediaFile[];
   post: boolean;
+  dpr: number;
+  appColors: AppColors;
   insets: Insets;
 };
 export type PatchPayload = {
@@ -60,6 +62,8 @@ const App = (): React.JSX.Element => {
   const setIsModalOpen = appStore(state => state.setIsModalOpen);
   const videoMutedState = appStore.getState().videoMutedState;
   const tagMode = appStore(state => state.tagMode);
+  const storeDpr = appStore(state => state.dpr);
+  const setDpr = appStore(state => state.setDpr);
   const currentEditorValues: EditorRecord = appStore(
     state => state.editorByIndex,
   );
@@ -83,6 +87,7 @@ const App = (): React.JSX.Element => {
 
   const activeButton = appStore(state => state.activeButton);
   const buttonsOpen = activeButton !== null;
+  const canvasSize = appStore(state => state.canvasSize);
 
   // ✅ Setup logging and global error handling
   useEffect(() => {
@@ -157,9 +162,14 @@ const App = (): React.JSX.Element => {
         return;
       }
       const payload = trimBase64({files: data.file});
-      rnLogger.log('📥 Processing injected HYDRATE', payload);
+      rnLogger.log(
+        '📥 Processing injected HYDRATE',
+        JSON.stringify(payload, null, 2),
+      );
       await applyHydrationData(data, 'Injection', setMediaFiles, setPost);
+      setAppColors(data.appColors);
       setSafeInsets(data.insets);
+      setDpr(data.dpr);
 
       // Notify RN that web is ready
       if (window.ReactNativeWebView) {
@@ -269,7 +279,11 @@ const App = (): React.JSX.Element => {
           JSON.stringify(filteredPayload, null, 2),
         );
 
-        if (window.ReactNativeWebView) {
+        if (
+          window.ReactNativeWebView &&
+          canvasSize.width > 0 &&
+          canvasSize.height > 0
+        ) {
           window.ReactNativeWebView.postMessage(
             JSON.stringify({
               type: 'CURRENT_ACTIVE_VALUES',
@@ -281,6 +295,8 @@ const App = (): React.JSX.Element => {
                       id: requestedSave.id || null,
                     }
                   : null,
+                canvasWidth: canvasSize.width,
+                canvasHeight: canvasSize.height,
                 ...filteredPayload,
               },
             }),
@@ -291,7 +307,7 @@ const App = (): React.JSX.Element => {
       rnLogger.error('Failed to send current active values to RN:', error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestedSave, requestedExport]);
+  }, [requestedSave, requestedExport, canvasSize]);
 
   useEffect(() => {
     try {
@@ -320,12 +336,12 @@ const App = (): React.JSX.Element => {
   }, [activeButton, tagMode]);
 
   useEffect(() => {
-    if (!mediaFiles.length) {
+    if (!mediaFiles.length || !storeDpr) {
       setInitializing(true);
     } else {
       setInitializing(false);
     }
-  }, [mediaFiles]);
+  }, [mediaFiles, storeDpr]);
 
   // Early return for loading state - kept as is
   if (isInitializing) {

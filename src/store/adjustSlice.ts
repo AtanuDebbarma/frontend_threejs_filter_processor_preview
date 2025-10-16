@@ -61,6 +61,9 @@ export type AdjustState = {
     preset?: Partial<AdjustTransform>,
     id?: string,
   ) => void;
+
+  canvasSize: {width: number; height: number};
+  setCanvasSize: (width: number, height: number) => void;
 };
 
 // ---------------------------
@@ -167,5 +170,10 @@ export const createAdjustSlice: StateCreator<
           ...(preset ?? {}),
         },
       };
+    }),
+  canvasSize: {width: 0, height: 0},
+  setCanvasSize: (width, height) =>
+    set(state => {
+      state.canvasSize = {width, height};
     }),
 });

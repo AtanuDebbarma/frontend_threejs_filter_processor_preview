@@ -1,9 +1,10 @@
 import {Canvas} from '@react-three/fiber';
-import React from 'react';
+import React, {useEffect} from 'react';
 import type {MediaItem} from '../../hooks/useVerifiedMediaFiles';
 import {FilteredMedia} from './FilteredMedia';
 import {appStore} from '../../store/appStore';
 import {defaultAdjustTransform} from '../../store/adjustSlice';
+import {useElementSize} from '../../hooks/useElementSize';
 
 type Props = {
   id: string;
@@ -31,6 +32,10 @@ export const MediaCanvas = ({
   index,
 }: Props): React.JSX.Element => {
   const adjustByIndex = appStore(state => state.adjustByIndex);
+  const setCanvasSize = appStore(state => state.setCanvasSize);
+
+  const {ref: containerRef, size: containerSize} =
+    useElementSize<HTMLDivElement>();
 
   const adjustTransform = adjustByIndex[index] ?? defaultAdjustTransform;
   const files = () => {
@@ -47,8 +52,19 @@ export const MediaCanvas = ({
     }
   };
 
+  useEffect(() => {
+    if (
+      containerSize &&
+      containerSize.width !== 0 &&
+      containerSize.height !== 0
+    ) {
+      setCanvasSize(containerSize.width, containerSize.height);
+    }
+  }, [containerSize, setCanvasSize]);
+
   return (
     <div
+      ref={containerRef}
       className="h-full w-full origin-center overflow-hidden rounded-[8px]"
       style={{
         backgroundColor:

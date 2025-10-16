@@ -22,6 +22,8 @@ export type FileSliceType = {
   setRequestedSave: (id: string | null, active: boolean) => void;
   videoMutedState: Record<number, {id: string; muted: boolean}>;
   setVideoMutedState: (index: number, id: string, muted: boolean) => void;
+  dpr: number | null;
+  setDpr: (dpr: number) => void;
 };
 
 export const createFileSlice: StateCreator<
@@ -35,6 +37,11 @@ export const createFileSlice: StateCreator<
   thumbCache: new Map(),
   requestedExport: false,
   videoMutedState: {},
+  dpr: null,
+  setDpr: (dpr: number) =>
+    set(state => {
+      state.dpr = dpr;
+    }),
 
   /**
    * Initialize media files and related slice states.
