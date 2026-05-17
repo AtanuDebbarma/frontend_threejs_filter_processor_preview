@@ -1,13 +1,29 @@
 import type {StateCreator} from 'zustand';
 import type {AppState} from './appStore';
+import type {MediaFile} from '../types/filterTypes';
+import {defaultEditor} from './editorSlice';
+import {defaultAdjustTransform} from './adjustSlice';
 
+export type RequestedSave = {
+  id: string | null; // which media file to save
+  active: boolean; // trigger flag
+};
 export type FileSliceType = {
-  mediaFiles: File[];
-  selectedMediaIndex: number;
-  setMediaFiles: (files: File[]) => void;
-  setSelectedMediaIndex: (index: number) => void;
-  videoThumbnailButton?: string;
-  setVideoThumbnailButton: (thumbnail: string | undefined) => void;
+  mediaFiles: MediaFile[];
+  activeIndex: number;
+  setMediaFiles: (files: MediaFile[]) => void;
+  thumbCache: Map<number, string>;
+  setThumbCache: (index: number, uri: string) => void;
+  setActiveIndex: (index: number) => void;
+  resetCache: () => void;
+  requestedExport: boolean;
+  setRequestedExport: (requested: boolean) => void;
+  requestedSave: RequestedSave;
+  setRequestedSave: (id: string | null, active: boolean) => void;
+  videoMutedState: Record<number, {id: string; muted: boolean}>;
+  setVideoMutedState: (index: number, id: string, muted: boolean) => void;
+  dpr: number | null;
+  setDpr: (dpr: number) => void;
 };
 
 export const createFileSlice: StateCreator<
@@ -15,19 +31,74 @@ export const createFileSlice: StateCreator<
   [['zustand/immer', never]],
   [],
   FileSliceType
-> = set => ({
+> = (set, get) => ({
   mediaFiles: [],
-  selectedMediaIndex: 0,
-  videoThumbnailButton: undefined,
+  activeIndex: 0,
+  thumbCache: new Map(),
+  requestedExport: false,
+  videoMutedState: {},
+  dpr: null,
+  setDpr: (dpr: number) =>
+    set(state => {
+      state.dpr = dpr;
+    }),
 
-  setMediaFiles: (files: File[]) =>
+  /**
+   * Initialize media files and related slice states.
+   */
+  setMediaFiles: (files: MediaFile[]) =>
     set(state => {
       state.mediaFiles = files;
-    }),
-  setVideoThumbnailButton: thumbnail =>
-    set(state => {
-      state.videoThumbnailButton = thumbnail;
+
+      // Initialize related slices (editor, adjust, tag)
+      files.forEach((file, index) => {
+        state.editorByIndex[index] = {
+          id: file.id,
+          value: {...defaultEditor},
+        };
+        state.adjustByIndex[index] = {
+          id: file.id,
+          value: {...defaultAdjustTransform},
+        };
+        state.tagValuesByIndex[index] = {id: file.id, tags: []};
+      });
+
+      // ✅ Initialize videoMutedState for all video files
+      const newMutedState: Record<number, {id: string; muted: boolean}> = {};
+      files.forEach((file, index) => {
+        if (file.mediaType === 'video') {
+          newMutedState[index] = {id: file.id, muted: false};
+        }
+      });
+      state.videoMutedState = newMutedState;
     }),
 
-  setSelectedMediaIndex: index => set({selectedMediaIndex: index}),
+  setActiveIndex: (index: number) =>
+    set(state => {
+      state.activeIndex = index;
+    }),
+
+  setThumbCache: (index, uri) => {
+    const cache = new Map(get().thumbCache);
+    cache.set(index, uri);
+    set({thumbCache: cache});
+  },
+  resetCache: () => {
+    set({thumbCache: new Map()});
+  },
+  setRequestedExport: (requested: boolean) => {
+    set(state => {
+      state.requestedExport = requested;
+    });
+  },
+  requestedSave: {id: null, active: false},
+  setRequestedSave: (id: string | null, active: boolean) =>
+    set(state => {
+      state.requestedSave = {id, active};
+    }),
+
+  setVideoMutedState: (index, id, muted) =>
+    set(state => {
+      state.videoMutedState[index] = {id, muted};
+    }),
 });

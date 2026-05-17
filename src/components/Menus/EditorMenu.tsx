@@ -8,28 +8,58 @@ import {appStore} from '../../store/appStore';
 import {
   getEditorSliderBinding,
   getColorBalanceBinding,
+  inlineStyle,
 } from '../../helpers/editor_helpers';
 import type {ColorBalance} from '../../types/filterTypes';
+import {faArrowLeft} from '@fortawesome/free-solid-svg-icons';
+import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import {defaultEditor, type EditorRecord} from '../../store/editorSlice';
+import type {AppColors, Insets} from '../../App';
 
 type Views = 'Editor' | EditorFilter['name'];
 
-export const EditorMenu = (): React.JSX.Element => {
+type resetParams = {
+  e: React.MouseEvent<HTMLButtonElement>;
+  global?: boolean;
+  overallByIndex?: boolean;
+  single?: boolean;
+};
+type Props = {
+  appColors: AppColors;
+  safeInsets: Insets;
+};
+
+export const EditorMenu = ({
+  appColors,
+  safeInsets,
+}: Props): React.JSX.Element => {
   const [view, setView] = useState<Views>('Editor');
   const activeFilter = appStore(state => state.activeFilter);
+  const mediaFiles = appStore(state => state.mediaFiles);
+  const activeIndex = appStore(state => state.activeIndex);
   const resetEditorState = appStore(state => state.resetEditorState);
+  const setActiveButton = appStore(state => state.setActiveButton);
 
   // Zustand selectors: always called unconditionally
-  const brightness = appStore(state => state.brightness);
-  const contrast = appStore(state => state.contrast);
-  const saturation = appStore(state => state.saturation);
-  const gamma = appStore(state => state.gamma);
-  const hue = appStore(state => state.hue);
-  const colorBalance: ColorBalance = appStore(state => state.colorBalance);
-  const sharpness = appStore(state => state.sharpness);
-  const shadows = appStore(state => state.shadows);
-  const highlights = appStore(state => state.highlights);
-  const temperature = appStore(state => state.temperature);
-  const blur = appStore(state => state.blur);
+  const editorByIndex: EditorRecord = appStore(state => state.editorByIndex);
+  const currentSelected = editorByIndex[activeIndex].value ?? defaultEditor;
+  const currentSelectedID = mediaFiles[activeIndex].id;
+
+  const brightness = currentSelected.brightness ?? 0.0;
+  const contrast = currentSelected.contrast ?? 1.0;
+  const saturation = currentSelected.saturation ?? 1.0;
+  const gamma = currentSelected.gamma ?? 1.0;
+  const hue = currentSelected.hue ?? 0.0;
+  const colorBalance: ColorBalance = currentSelected.colorBalance ?? {
+    r: 0.0,
+    g: 0.0,
+    b: 0.0,
+  };
+  const sharpness = currentSelected.sharpness ?? 0.0;
+  const shadows = currentSelected.shadows ?? 0.0;
+  const highlights = currentSelected.highlights ?? 0.0;
+  const temperature = currentSelected.temperature ?? 0.0;
+  const blur = currentSelected.blur ?? 0.0;
 
   const setBrightness = appStore(state => state.setBrightness);
   const setContrast = appStore(state => state.setContrast);
@@ -75,119 +105,231 @@ export const EditorMenu = (): React.JSX.Element => {
   // Get slider binding for the current key (except colorBalance)
   const sliderBinding = getEditorSliderBinding(
     bindingKey,
+    activeIndex,
     storeValues,
     storeSetters,
+    currentSelectedID,
   );
 
   // Get color balance bindings (separate UI)
   const colorBinding = getColorBalanceBinding(
     {
-      r: colorBalance.r ?? 0,
-      g: colorBalance.g ?? 0,
-      b: colorBalance.b ?? 0,
+      r: colorBalance.r ?? 0.0,
+      g: colorBalance.g ?? 0.0,
+      b: colorBalance.b ?? 0.0,
     },
+    activeIndex,
     setColorBalance,
+    currentSelectedID,
   );
 
-  // Reset editor state to active filter params (no scaling)
-  const reset = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const reset = ({
+    e,
+    global = false,
+    overallByIndex = false,
+    single = false,
+  }: resetParams) => {
     e.preventDefault();
     if (!activeFilter) return;
     const params = activeFilter.params;
-    resetEditorState({
-      brightness: params.brightness ?? 0,
-      contrast: params.contrast ?? 1,
-      saturation: params.saturation ?? 1,
-      gamma: params.gamma ?? 1,
-      hue: params.hue ?? 0,
-      colorBalance: params.colorBalance ?? {r: 0, g: 0, b: 0},
-      sharpness: params.unsharp?.amount ?? 0,
-      shadows: params.shadows ?? 0,
-      highlights: params.highlights ?? 0,
-      temperature: params.temperature ?? 0,
-      blur: params.blur ?? 0,
-    });
+
+    const mappedParams = {
+      brightness: params.brightness ?? 0.0,
+      contrast: params.contrast ?? 1.0,
+      saturation: params.saturation ?? 1.0,
+      gamma: params.gamma ?? 1.0,
+      hue: params.hue ?? 0.0,
+      colorBalance: params.colorBalance ?? {r: 0.0, g: 0.0, b: 0.0},
+      sharpness: params.unsharp?.amount ?? 0.0,
+      shadows: params.shadows ?? 0.0,
+      highlights: params.highlights ?? 0.0,
+      temperature: params.temperature ?? 0.0,
+      blur: params.blur ?? 0.0,
+    };
+
+    if (global) {
+      // Reset ALL indexes (all media items) back to activeFilter params
+      mediaFiles.forEach((_, index) => {
+        resetEditorState(index, mappedParams);
+      });
+    } else if (overallByIndex) {
+      // Reset ALL sliders for the CURRENT activeIndex
+      resetEditorState(activeIndex, mappedParams);
+    } else if (single && currentFilter) {
+      // Reset ONLY the current slider (e.g. brightness) for CURRENT activeIndex
+      const key = currentFilter.key as keyof typeof mappedParams;
+      resetEditorState(activeIndex, {
+        [key]: mappedParams[key],
+      });
+    }
+  };
+
+  const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    setTimeout(() => {
+      if (view !== 'Editor') {
+        setView('Editor');
+      } else {
+        setActiveButton('editorMainMenu');
+      }
+    }, 200);
   };
 
   return (
-    <footer
-      className={`fixed right-0 bottom-0 left-0 flex ${
-        view !== 'Color Balance' ? 'h-[23%]' : 'h-[30%]'
-      } flex-col rounded-t-lg border-t border-gray-800 bg-white backdrop-blur-lg`}>
-      <div
-        className={`${view === 'Color Balance' ? 'pt-2 pb-2' : 'py-4'} text-center`}>
-        <h3 className="text-md font-medium text-black">{view}</h3>
-      </div>
+    <>
+      <style>{inlineStyle}</style>
+      <footer
+        className={`fixed right-0 bottom-0 left-0 z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]`}
+        style={{
+          backgroundColor: appColors.bottomMenuBackground,
+          paddingBottom: `${safeInsets.bottom + 10}px`,
+        }}>
+        <div className="flex items-center px-4 py-1">
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-1 text-orange-600 transition-opacity duration-180 active:opacity-50">
+            <FontAwesomeIcon icon={faArrowLeft} size="sm" />
+            <span className="text-sm font-medium">Back</span>
+          </button>
+        </div>
 
-      {view === 'Editor' ? (
-        <>
-          <div className="scrollbar-hide mx-2 flex space-x-4 overflow-x-auto">
-            {EditableFilters.map((editor, idx) => (
+        <div
+          className={`${view === 'Color Balance' ? 'pt-[-1.8rem] pb-2' : 'pt-[-1rem] pb-4'} text-center`}>
+          <h3
+            className="text-md font-medium"
+            style={{
+              color: appColors.textColor,
+            }}>
+            {view}
+          </h3>
+        </div>
+
+        {view === 'Editor' ? (
+          <>
+            <div className="scrollbar-hide mx-2 flex space-x-4 overflow-x-auto">
+              {EditableFilters.map((editor, idx) => (
+                <button
+                  key={`${editor.key}-${idx}`}
+                  onClick={() => setView(editor.name)}
+                  className="mx-1.5 flex-1 rounded-lg border border-gray-300 px-4 py-2 shadow-sm transition-opacity duration-180 active:opacity-50"
+                  style={{
+                    backgroundColor: appColors.buttonColor,
+                  }}>
+                  <p
+                    className="font-md text-sm text-nowrap"
+                    style={{
+                      color: appColors.textColor,
+                    }}>
+                    {editor.name}
+                  </p>
+                </button>
+              ))}
+            </div>
+
+            <div className="align-center mt-4 flex w-full flex-row justify-center gap-2">
               <button
-                key={`${editor.key}-${idx}`}
-                onClick={() => setView(editor.name)}
-                className="mx-1.5 flex-1 rounded-lg border border-gray-300 bg-gray-200 px-4 py-2 shadow-sm transition active:bg-gray-200 active:shadow-inner">
-                <p className="font-md text-sm text-nowrap text-gray-700">
-                  {editor.name}
-                </p>
+                className="align-center font-md xxxs:w-[28%] flex w-[32%] justify-center rounded-lg border border-gray-300 bg-[#ff4800] px-5 py-2 text-white shadow-sm transition-opacity duration-180 active:opacity-50"
+                onClick={e => reset({e, overallByIndex: true})}>
+                Reset
               </button>
-            ))}
-          </div>
 
-          <div className="align-center mt-4 flex w-full justify-center">
-            <button
-              className="align-center font-md flex w-[30%] justify-center rounded-lg border border-gray-300 bg-[#ff4800] px-5 py-1 text-white shadow-sm transition active:bg-gray-200 active:shadow-inner"
-              onClick={reset}>
-              Reset
-            </button>
+              <button
+                className="align-center font-md xxxs:w-[28%] flex w-[32%] justify-center rounded-lg border border-gray-300 bg-gray-400 px-5 py-2 text-white shadow-sm transition-opacity duration-180 active:opacity-50"
+                onClick={e => reset({e, global: true})}>
+                Reset All
+              </button>
+            </div>
+          </>
+        ) : view === 'Color Balance' ? (
+          <div className="flex w-full flex-col items-center gap-4 px-2">
+            {(['r', 'g', 'b'] as const).map(channel => (
+              <div
+                key={channel}
+                className="flex w-full flex-row items-center gap-3">
+                <span
+                  className="w-4 text-sm font-medium"
+                  style={{
+                    color: appColors.textColor,
+                  }}>
+                  {channel.toUpperCase()}
+                </span>
+                <input
+                  type="range"
+                  min={colorBinding.min}
+                  max={colorBinding.max}
+                  step={colorBinding.step}
+                  value={colorBinding.values[channel]}
+                  onChange={e =>
+                    colorBinding.setValue(channel, Number(e.target.value))
+                  }
+                  className="flex-1"
+                  style={
+                    {
+                      '--value': `${
+                        ((colorBinding.values[channel] - colorBinding.min) /
+                          (colorBinding.max - colorBinding.min)) *
+                        100
+                      }%`,
+                    } as React.CSSProperties
+                  }
+                />
+
+                <span
+                  className="font-mediu w-10 text-right text-sm"
+                  style={{
+                    color: appColors.textColor,
+                  }}>
+                  {colorBinding.values[channel].toFixed(2)}
+                </span>
+              </div>
+            ))}
+            <div className="align-center xxxs:mt-1 mt-[-0.2rem] flex w-full justify-center">
+              <button
+                className="align-center font-md xxxs:w-[40%] flex w-[45%] justify-center rounded-lg border border-gray-300 bg-[#ff4800] px-5 py-2 text-white shadow-sm transition-opacity duration-180 active:opacity-50"
+                onClick={e => reset({e, single: true})}>
+                Reset Current
+              </button>
+            </div>
           </div>
-        </>
-      ) : view === 'Color Balance' ? (
-        <div className="flex w-full flex-col items-center gap-4 px-4">
-          {(['r', 'g', 'b'] as const).map(channel => (
-            <div key={channel} className="flex w-full flex-row items-center">
-              <span className="mr-2 text-sm text-gray-700">
-                {channel.toUpperCase()}
-              </span>
+        ) : (
+          <div className="flex w-full flex-col items-center gap-4 px-4">
+            <div className="flex w-full flex-row items-center gap-3 px-2">
               <input
                 type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={colorBinding.values[channel]}
-                onChange={e =>
-                  colorBinding.setValue(channel, Number(e.target.value))
+                min={sliderBinding.min}
+                max={sliderBinding.max}
+                step={sliderBinding.step}
+                value={sliderBinding.value}
+                onChange={e => sliderBinding.onChange(Number(e.target.value))}
+                className="flex-1"
+                style={
+                  {
+                    '--value': `${
+                      ((sliderBinding.value - sliderBinding.min) /
+                        (sliderBinding.max - sliderBinding.min)) *
+                      100
+                    }%`,
+                  } as React.CSSProperties
                 }
-                className="w-full"
               />
+              <span
+                className="w-12 text-right text-sm font-medium"
+                style={{
+                  color: appColors.textColor,
+                }}>
+                {sliderBinding.value.toFixed(2)}
+              </span>
             </div>
-          ))}
-
-          <button
-            onClick={() => setView('Editor')}
-            className="font-md rounded-lg border border-gray-300 bg-gray-200 px-4 py-1 text-sm text-gray-700">
-            Back
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center px-4">
-          <input
-            type="range"
-            min={sliderBinding.min}
-            max={sliderBinding.max}
-            step={1}
-            value={sliderBinding.value}
-            onChange={e => sliderBinding.onChange(Number(e.target.value))}
-            className="w-full"
-          />
-
-          <button
-            onClick={() => setView('Editor')}
-            className="font-md mt-4 rounded-lg border border-gray-300 bg-gray-200 px-4 py-1 text-gray-700">
-            Back
-          </button>
-        </div>
-      )}
-    </footer>
+            <div className="align-center mt-4 flex w-full justify-center">
+              <button
+                className="align-center font-md xxxs:w-[40%] flex w-[48%] justify-center rounded-lg border border-gray-300 bg-[#ff4800] px-5 py-2 text-white shadow-sm transition-opacity duration-180 active:opacity-50"
+                onClick={e => reset({e, single: true})}>
+                Reset Current
+              </button>
+            </div>
+          </div>
+        )}
+      </footer>
+    </>
   );
 };

@@ -1,11 +1,29 @@
+// src/assets/filters/filterData.ts
+
 import type {FilterItem} from '../../types/filterTypes';
 
+/**
+ * List of available filters
+ */
 export const FILTERS: FilterItem[] = [
   {
     name: 'Original',
     key: 'none',
     category: 'None',
-    params: {},
+    params: {
+      brightness: 0,
+      contrast: 1,
+      saturation: 1,
+      gamma: 1,
+      hue: 0,
+      colorBalance: {r: 0, g: 0, b: 0},
+      curves: [],
+      shadows: 0,
+      highlights: 0,
+      temperature: 0,
+      blur: 0,
+      unsharp: {amount: 0, radius: 0, threshold: 0},
+    },
   },
 
   // Color Boost - Enhanced with professional vibrancy
@@ -359,3 +377,17 @@ export const FILTERS: FilterItem[] = [
     },
   },
 ];
+
+/**
+ * A mapping of filter categories to gradient colors
+ */
+export const CATEGORY_GRADIENTS: Record<string, string[]> = {
+  'Color Boost': ['#ff6a00', '#ffcc00'], // orange → yellow
+  Lifestyle: ['#a18cd1', '#fbc2eb'], // purple → pink
+  Moody: ['#434343', '#000000'], // gray → black
+  Portrait: ['#ff9a9e', '#fecfef'], // soft pinks
+  'Black & White': ['#ffffff', '#000000'], // white → black
+  Cinematic: ['#00c6ff', '#0072ff'], // teal → blue
+  Nature: ['#56ab2f', '#a8e063'], // green shades
+  Landscape: ['#f7971e', '#ffd200'], // orange → gold
+};

@@ -56,3 +56,36 @@ export type FilterItem = {
   category: FilterCategory;
   params: FilterParams;
 };
+
+export type MediaFile = {
+  id: string;
+  filename: string;
+  uri: string;
+  mediaType: 'photo' | 'video';
+  width: number;
+  height: number;
+  creationTime?: number;
+  modificationTime?: number;
+  duration?: number;
+  albumId?: string;
+};
+
+export const defaultFilter: FilterItem = {
+  name: 'Original',
+  key: 'none',
+  category: 'None',
+  params: {
+    brightness: 0,
+    contrast: 1,
+    saturation: 1,
+    gamma: 1,
+    hue: 0,
+    colorBalance: {r: 0, g: 0, b: 0},
+    curves: [],
+    shadows: 0,
+    highlights: 0,
+    temperature: 0,
+    blur: 0,
+    unsharp: {amount: 0, radius: 0, threshold: 0},
+  },
+};

@@ -5,7 +5,7 @@ export type EditorSettings =
   | 'gamma'
   | 'hue'
   | 'colorBalance'
-  | 'curves'
+  // | 'curves'
   | 'sharpness'
   | 'shadows'
   | 'highlights'
@@ -22,10 +22,9 @@ export const EditableFilters: EditorFilter[] = [
   {name: 'Brightness', key: 'brightness'},
   {name: 'Contrast', key: 'contrast'},
   {name: 'Saturation', key: 'saturation'},
-  {name: 'Gamma', key: 'gamma'},
   {name: 'Hue', key: 'hue'},
   {name: 'Color Balance', key: 'colorBalance'},
-  {name: 'Curves', key: 'curves'},
+  // {name: 'Curves', key: 'curves'},
   {name: 'Sharpness', key: 'sharpness'},
   {name: 'Shadows', key: 'shadows'},
   {name: 'Highlights', key: 'highlights'},
