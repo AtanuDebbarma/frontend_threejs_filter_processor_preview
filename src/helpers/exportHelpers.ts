@@ -6,9 +6,11 @@ import type {FilterItem, FilterParams, MediaFile} from '../types/filterTypes';
  * Normalize the active filter, current editor values, and current store adjust
  * for export.
  *
- * @param {FilterIte} activeFilter - The currently active filter.
- * @param {EditorRecord} currentEditorValues - The current values of the editor.
- * @param {AdjustRecord} currentStoreAdjust - The current values of the store adjust.
+ * @param activeFilter - The currently active filter.
+ * @param  currentEditorValues - The current values of the editor.
+ * @param  mediaFiles - The list of media files.
+ * @param  videoMutedState - The current muted state of videos.
+ * @param  currentStoreAdjust - The current values of the store adjust.
  *
  * @return {{filter: string | null, files:object}} - An object containing the normalized filter and files.
  */
@@ -48,8 +50,6 @@ export function normalizeForExport({
       delete (merged as any).sharpness;
       delete (merged as any).ffmpeg;
       delete (merged as any).order;
-      delete (merged as any).colorSpace;
-      delete (merged as any).inputRange;
       // const ffmpegCmd = buildFfmpegString(merged, activeFilter.params.order);
 
       const mutedEntry = videoMutedState[Number(index)];

@@ -8,6 +8,7 @@ import ClipLoader from 'react-spinners/ClipLoader';
 import {useGesture} from '@use-gesture/react';
 import {useElementSize} from '../../hooks/useElementSize';
 import Sketch from '@uiw/react-color-sketch';
+import {mat4} from 'gl-matrix';
 import {
   defaultAdjustTransform,
   type AdjustRecord,
@@ -349,14 +350,76 @@ export const AdjustMenu = ({
 
   const handleConfirm = () => {
     if (activeFile?.width && activeFile?.height) {
+      const targetWidth = 1080;
+      const targetHeight = post ? 1350 : 1920;
+      const targetAspect = targetWidth / targetHeight;
+      const mediaAspect = activeFile.width / activeFile.height;
+
+      const projection = mat4.create();
+      mat4.ortho(projection, -1, 1, -1, 1, -1, 1);
+
+      // ✅ IMPROVED: Handle both wide and tall images
+      let quadScaleX = 1.0;
+      let quadScaleY = 1.0;
+
+      if (mediaAspect > targetAspect) {
+        // Wide image in tall container (e.g., 16:9 image in 4:5 post)
+        quadScaleX = mediaAspect / targetAspect;
+        quadScaleY = 1.0;
+        if (quadScaleX > 1.0) {
+          quadScaleY = 1.0 / quadScaleX;
+          quadScaleX = 1.0;
+        }
+      } else {
+        // Tall image in wide container (e.g., 4:5 image in 16:9 story)
+        quadScaleY = targetAspect / mediaAspect;
+        quadScaleX = 1.0;
+        if (quadScaleY > 1.0) {
+          quadScaleX = 1.0 / quadScaleY;
+          quadScaleY = 1.0;
+        }
+      }
+
+      const scaleFactorX = targetWidth / activeFile.width;
+      const scaleFactorY = targetHeight / activeFile.height;
+
+      const worldX = position.x;
+      const worldY = position.y;
+
+      const normalizedX = ((worldX * scaleFactorX) / targetWidth) * 2.0;
+      const normalizedY = -((worldY * scaleFactorY) / targetHeight) * 2.0;
+
+      const rotRad = -(rotation * Math.PI) / 180.0;
+
+      const model = mat4.create();
+      mat4.translate(model, model, [normalizedX, normalizedY, 0]);
+      mat4.rotateZ(model, model, rotRad);
+      mat4.scale(model, model, [scale * quadScaleX, scale * quadScaleY, 1]);
+
+      const mvp = mat4.create();
+      mat4.multiply(mvp, projection, model);
+
       setAdjustTransform(activeIndex, currentActiveId, {
         x: position.x / activeFile.width,
         y: position.y / activeFile.height,
         scale: scale,
         rotation: rotation,
         bgColor: localBgColor,
+        mvp: Array.from(mvp),
       });
+
+      rnLogger.log('✅ MVP Matrix (Export Space):', mvp);
+      rnLogger.log(
+        `Target: ${targetWidth}×${targetHeight}, Media: ${activeFile.width}×${activeFile.height}`,
+      );
+      rnLogger.log(
+        `Aspect: media=${mediaAspect.toFixed(3)}, target=${targetAspect.toFixed(3)}`,
+      );
+      rnLogger.log(
+        `QuadScale: X=${quadScaleX.toFixed(3)}, Y=${quadScaleY.toFixed(3)}`,
+      );
     }
+
     setTimeout(() => {
       changeButton();
     }, 200);
