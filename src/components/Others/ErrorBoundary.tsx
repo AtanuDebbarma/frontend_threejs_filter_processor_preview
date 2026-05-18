@@ -71,7 +71,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <summary className="cursor-pointer font-semibold">
                 Error Details
               </summary>
-              <pre className="mt-2 rounded bg-red-800 p-2 break-words whitespace-pre-wrap">
+              <pre className="mt-2 rounded bg-red-800 p-2 wrap-break-word whitespace-pre-wrap">
                 {this.state.error?.message}
                 {'\n\n'}
                 {this.state.error?.stack}
@@ -92,6 +92,7 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 // Higher-order component for adding error boundaries to any component
+// eslint-disable-next-line react-refresh/only-export-components
 export function withErrorBoundary<P extends object>(
   Component: React.ComponentType<P>,
   errorBoundaryProps?: Omit<Props, 'children'>,

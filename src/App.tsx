@@ -142,13 +142,20 @@ const App = (): React.JSX.Element => {
   //   (window as any).__EXPO_MEDIA__ = {
   //     file: mockMedia,
   //     post: true,
+  //     dpr: window.devicePixelRatio || 2,
+  //     appColors: {
+  //       backgroundColorMain: 'rgba(227, 228, 231, 1)',
+  //       bottomMenuBackground: 'rgba(253, 253, 255, 1)',
+  //       textColor: 'rgba(0, 0, 0, 1)',
+  //       buttonColor: 'rgba(217, 217, 217, 1)',
+  //     },
   //     insets: {
   //       top: 0,
   //       bottom: 16,
   //       left: 0,
   //       right: 0,
   //     },
-  //   };
+  //   } satisfies HydrationPayload;
 
   //   // simulate RN dispatch
   //   window.dispatchEvent(new Event('mediaReady'));
@@ -167,9 +174,15 @@ const App = (): React.JSX.Element => {
         JSON.stringify(payload, null, 2),
       );
       await applyHydrationData(data, 'Injection', setMediaFiles, setPost);
-      setAppColors(data.appColors);
-      setSafeInsets(data.insets);
-      setDpr(data.dpr);
+      if (data.appColors) {
+        setAppColors(data.appColors);
+      }
+      if (data.insets) {
+        setSafeInsets(data.insets);
+      }
+      if (data.dpr != null) {
+        setDpr(data.dpr);
+      }
 
       // Notify RN that web is ready
       if (window.ReactNativeWebView) {
@@ -182,7 +195,7 @@ const App = (): React.JSX.Element => {
     window.addEventListener('mediaReady', listener);
 
     // Also try to run immediately in case the event already fired
-    listener();
+    void listener();
 
     return () => {
       window.removeEventListener('mediaReady', listener);

@@ -37,6 +37,10 @@ const isRNLocalUrl = (url: string) =>
   url.startsWith('content:') ||
   url.startsWith('ph:');
 
+/** Vite dev/build asset paths (e.g. `/src/assets/foo.mp4` from `import url`) */
+const isBundledAssetUrl = (url: string) =>
+  url.startsWith('/') && !url.startsWith('//');
+
 export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const createdUrlsRef = useRef<string[]>([]);
@@ -69,8 +73,8 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
         };
       }
 
-      // 🌐 If not blob/data/RN local → fetch and wrap in blob URL
-      if (!isBlobUrl(uri)) {
+      // 🌐 Remote URL → fetch and wrap in blob URL (skip for blob/data/RN/bundled Vite assets)
+      if (!isBlobUrl(uri) && !isBundledAssetUrl(uri)) {
         try {
           const res = await fetch(uri);
           const blob = await res.blob();
@@ -191,7 +195,7 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
       });
     };
 
-    Promise.all(files.map(loadFile)).then(list => {
+    void Promise.all(files.map(loadFile)).then(list => {
       if (mounted) setMediaList(list);
     });
 

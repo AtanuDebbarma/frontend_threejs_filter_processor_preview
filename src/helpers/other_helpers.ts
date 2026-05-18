@@ -4,6 +4,7 @@ import type {HydrationPayload} from '../App';
 import type {MediaItem} from '../hooks/useVerifiedMediaFiles';
 import {type MediaFile} from '../types/filterTypes';
 import {rnLogger} from '../utils/rnLogger';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import React from 'react';
 
 type TrimParams = {

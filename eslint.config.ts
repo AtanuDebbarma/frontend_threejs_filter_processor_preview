@@ -1,4 +1,4 @@
-// eslint.config.js
+// eslint.config.ts
 import js from '@eslint/js';
 import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -6,33 +6,37 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-plugin-prettier';
 import eslintPluginImport from 'eslint-plugin-import';
-import eslintPluginNode from 'eslint-plugin-node';
 import eslintPluginReact from 'eslint-plugin-react';
+import {defineConfig, globalIgnores} from 'eslint/config';
 
-export default tseslint.config(
+/** React Compiler / R3F rules that conflict with Three.js + @react-three/fiber patterns. */
+const r3fCompilerRulesOff = {
+  'react-hooks/refs': 'off',
+  'react-hooks/immutability': 'off',
+  'react-hooks/static-components': 'off',
+} as const;
+
+export default defineConfig([
+  globalIgnores(['dist', 'node_modules', '**/node_modules/**']),
   {
-    ignores: [
-      'dist',
-      'node_modules',
-      'eslint.config.ts',
-      'index.html',
-      'src/index.css',
+    files: ['src/**/*.{ts,tsx,js,jsx}'],
+    extends: [
+      js.configs.recommended,
+      ...tseslint.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
     ],
-  },
-  {
-    files: ['**/*.{ts,tsx,js,jsx,css,scss}'],
     languageOptions: {
-      ecmaVersion: 'latest',
+      ecmaVersion: 2020,
       sourceType: 'module',
-      parser: tseslint.parser,
-      parserOptions: {
-        ecmaFeatures: {
-          jsx: true,
-        },
-      },
       globals: {
         ...globals.browser,
         ...globals.node,
+      },
+      parser: tseslint.parser,
+      parserOptions: {
+        project: './tsconfig.app.json',
+        tsconfigRootDir: import.meta.dirname,
       },
     },
     settings: {
@@ -50,35 +54,80 @@ export default tseslint.config(
       },
     },
     plugins: {
-      'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
       prettier,
       import: eslintPluginImport,
-      node: eslintPluginNode,
       react: eslintPluginReact,
+      '@typescript-eslint': tseslint.plugin,
     },
     rules: {
-      ...js.configs.recommended.rules,
-      ...tseslint.configs.recommended[0].rules,
-      ...reactHooks.configs.recommended.rules,
+      'prettier/prettier': 'error',
 
+      'no-console': 'off',
+      'import/no-unresolved': 'error',
+      'import/no-deprecated': 'warn',
+      'no-unused-vars': 'off',
+      'no-warning-comments': 'warn',
+      'no-nested-ternary': 'off',
+      'no-useless-assignment': 'off',
+
+      // REACT (aligned with mbt/eslint.config.js)
+      'react/react-in-jsx-scope': 'off',
+      'react/jsx-no-useless-fragment': 'off',
+      'react/no-deprecated': 'warn',
       'react-refresh/only-export-components': [
         'warn',
         {allowConstantExport: true},
       ],
 
-      'prettier/prettier': 'error',
-      'react/react-in-jsx-scope': 'off',
-      'no-console': 'off',
-      'import/no-unresolved': 'error',
-      'node/no-missing-require': 'off',
-      'no-unused-vars': 'off',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/immutability': 'off',
+
+      '@typescript-eslint/no-unused-vars': ['error', {argsIgnorePattern: '^_'}],
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/no-floating-promises': 'warn',
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-unused-expressions': 'off',
+      '@typescript-eslint/no-deprecated': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   {
-    files: ['**/*.{js,jsx,ts,tsx,css,scss}'],
+    files: ['src/components/Filters_And_MediaOutput/**/*.{ts,tsx}'],
+    rules: r3fCompilerRulesOff,
+  },
+  {
+    // Fix applied to this block targeting config files
+    files: ['*.{ts,js}', '*.config.{ts,js}'],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
+      parser: tseslint.parser,
+      // Added project and tsconfigRootDir here:
+      parserOptions: {
+        project: './tsconfig.node.json', // OR './tsconfig.json' depending on where eslint.config.ts is included
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    plugins: {
+      prettier,
+      '@typescript-eslint': tseslint.plugin,
+    },
     rules: {
-      'no-warning-comments': 'error',
+      'prettier/prettier': 'error',
+      'no-console': 'off',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', {argsIgnorePattern: '^_'}],
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/no-require-imports': 'error',
+      '@typescript-eslint/no-unused-expressions': 'error',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-floating-promises': 'warn',
     },
   },
-);
+]);

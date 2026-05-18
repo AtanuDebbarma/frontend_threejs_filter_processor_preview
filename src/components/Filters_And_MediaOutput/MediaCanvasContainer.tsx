@@ -9,7 +9,7 @@ import {
   faVolumeHigh,
   faCircleUser,
 } from '@fortawesome/free-solid-svg-icons';
-import ClipLoader from 'react-spinners/ClipLoader';
+import {ClipLoader} from 'react-spinners';
 import {useActiveMediaIndex} from '../../hooks/useActiveMediaIndex';
 import {
   useVerifiedMediaFiles,
@@ -381,7 +381,7 @@ export const MediaCanvasContainer = ({
     );
   } else if (!post && mediaList[0] && mediaList.length) {
     return (
-      <div className="h-full w-full flex-shrink-0 snap-center overflow-hidden bg-gray-950">
+      <div className="h-full w-full shrink-0 snap-center overflow-hidden bg-gray-950">
         {mediaList[0].mediaType === 'video' ? (
           <div
             ref={setItemRef(0)}
@@ -401,7 +401,6 @@ export const MediaCanvasContainer = ({
               />
             )}
             <RenderTagIcon />
-
             {/* UPDATED: Show button logic (like RN code) */}
             {(playerIconTappedMap[0] || !playingMap[0] || showButtonMap[0]) && (
               <div className="pointer-events-none absolute top-1/2 left-1/2 z-500 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/50 p-4 text-white hover:bg-black/80">
@@ -478,7 +477,7 @@ export const MediaCanvasContainer = ({
             ref={setItemRef(index)}
             data-index={index}
             key={`media-${index}`}
-            className="relative h-full w-full flex-shrink-0 snap-center overflow-hidden rounded-lg border-[0.5px] border-gray-500 bg-gray-950">
+            className="relative h-full w-full shrink-0 snap-center overflow-hidden rounded-lg border-[0.5px] border-gray-500 bg-gray-950">
             {mediaFiles.length > 1 && (
               <div className="absolute top-0 right-0 z-500 mt-2 mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-[#FF4800]">
                 <p className="rounded-full p-0.5 text-[10px] text-white">
