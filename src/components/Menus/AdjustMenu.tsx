@@ -4,7 +4,7 @@ import {appStore} from '../../store/appStore';
 import {faXmark} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {getVideoThumbnail} from '../../helpers/filter_helper';
-import ClipLoader from 'react-spinners/ClipLoader';
+import {ClipLoader} from 'react-spinners';
 import {useGesture} from '@use-gesture/react';
 import {useElementSize} from '../../hooks/useElementSize';
 import Sketch from '@uiw/react-color-sketch';
@@ -140,7 +140,7 @@ export const AdjustMenu = ({
       return;
     }
     let mounted = true;
-    (async () => {
+    void (async () => {
       setIsLoadingThumb(true);
       try {
         const thumb = await getVideoThumbnail(
@@ -444,20 +444,20 @@ export const AdjustMenu = ({
 
   return (
     <div
-      className="absolute right-0 bottom-0 left-0 z-5000 h-[100%] rounded-lg bg-[rgba(0,0,0,0.8)] px-0 backdrop-blur-lg"
+      className="absolute right-0 bottom-0 left-0 z-5000 h-full rounded-lg bg-[rgba(0,0,0,0.8)] px-0 backdrop-blur-lg"
       onClick={() => setShowColorPicker(false)}
       style={{
         paddingBottom: `${safeInsets.bottom + 10}px`,
       }}>
       <button
         onClick={handleBack}
-        className={`absolute ${closeTop} z-1000 -translate-x-1/2 -translate-y-1/2 rounded-full border-1 border-gray-100/20 bg-black/40 p-1 text-sm text-white hover:bg-black/80`}>
+        className={`absolute ${closeTop} z-1000 -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-100/20 bg-black/40 p-1 text-sm text-white hover:bg-black/80`}>
         <FontAwesomeIcon icon={faXmark} size="lg" color="white" />
       </button>
 
       <div
         ref={previewRef}
-        className={`relative flex w-full items-center justify-center overflow-hidden rounded-[8px] border-1 ${aspect}`}
+        className={`relative flex w-full items-center justify-center overflow-hidden rounded-lg border ${aspect}`}
         style={{backgroundColor: localBgColor}}>
         {activeFile ? (
           activeFile.mediaType === 'video' ? (
@@ -522,7 +522,7 @@ export const AdjustMenu = ({
               animation: 'fadeInTag 0.25s ease-out',
               pointerEvents: 'auto',
             }}>
-            <span className="mr-1 max-w-[100px] min-w-[30px] truncate overflow-hidden font-medium text-ellipsis whitespace-nowrap">
+            <span className="mr-1 max-w-25 min-w-7.5 truncate overflow-hidden font-medium text-ellipsis whitespace-nowrap">
               {tag.username ? `${tag.username}` : ''}
             </span>
             <button
@@ -543,12 +543,12 @@ export const AdjustMenu = ({
           <div className="mt-8 flex w-full flex-row items-center justify-center gap-2">
             <button
               onClick={reset}
-              className="z-1000 flex w-28 items-center justify-center rounded-[10px] border-1 border-gray-100/20 bg-gray-500 p-4 text-sm font-medium text-white transition-opacity duration-180 hover:bg-gray-700 active:opacity-50">
+              className="z-1000 flex w-28 items-center justify-center rounded-[10px] border border-gray-100/20 bg-gray-500 p-4 text-sm font-medium text-white transition-opacity duration-180 hover:bg-gray-700 active:opacity-50">
               Reset
             </button>
             <button
               onClick={handleConfirm}
-              className="z-1000 flex w-28 items-center justify-center rounded-[10px] border-1 border-gray-100/20 bg-[#ff4800] p-4 text-sm font-medium text-white transition-opacity duration-180 hover:bg-[#ff4800]/80 active:opacity-50">
+              className="z-1000 flex w-28 items-center justify-center rounded-[10px] border border-gray-100/20 bg-[#ff4800] p-4 text-sm font-medium text-white transition-opacity duration-180 hover:bg-[#ff4800]/80 active:opacity-50">
               Confirm
             </button>
             <button
@@ -556,7 +556,7 @@ export const AdjustMenu = ({
                 e.stopPropagation();
                 setShowColorPicker(!showColorPicker);
               }}
-              className="font-regular z-1000 flex w-28 items-center justify-center rounded-[10px] border-1 border-gray-100/20 bg-gray-500 p-4 text-sm text-white transition-opacity duration-180 hover:bg-gray-700 active:opacity-50">
+              className="font-regular z-1000 flex w-28 items-center justify-center rounded-[10px] border border-gray-100/20 bg-gray-500 p-4 text-sm text-white transition-opacity duration-180 hover:bg-gray-700 active:opacity-50">
               Background
             </button>
           </div>

@@ -198,7 +198,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     // image path: create texture immediately
     if (!props.isVideo) {
       // start "applying / loading" flag
-      (async () => {
+      void (async () => {
         try {
           await setIsApplyingFilter(true);
           didSetApplyingRef.current = true;
@@ -210,7 +210,11 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
             pendingClearRef.current = null;
           }
         } catch (e) {
-          // ignore
+          rnLogger.componentLog(
+            'FilteredMedia',
+            'error',
+            `Failed to set applying flag: ${e}`,
+          );
         }
       })();
       const loader = new THREE.TextureLoader();
@@ -336,8 +340,9 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       try {
         document.body.appendChild(container);
       } catch (e2) {
-        // ignore
+        console.log(e2);
       }
+      console.log(e);
     }
     videoContainerRef.current = container;
 
@@ -360,7 +365,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
           pendingClearRef.current = null;
         }
       } catch (e) {
-        // ignore
+        console.log(e);
       }
 
       try {
@@ -432,7 +437,11 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
           );
         }
       } catch (e) {
-        // ignore
+        rnLogger.componentLog(
+          'FilteredMedia',
+          'error',
+          `Failed to reset video element: ${e}`,
+        );
       }
       videoContainerRef.current = null;
 
@@ -441,7 +450,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         videoEl.src = '';
         videoEl.load && videoEl.load();
       } catch (e) {
-        // ignore
+        rnLogger.componentLog('FilteredMedia', 'error', `${e}`);
       }
       videoElRef.current = null;
     };
@@ -773,15 +782,18 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   useEffect(() => {
     const mat: any = materialRef.current;
     if (!mat) return;
+    const textureImage = mediaTextureState?.image as
+      | {width?: number; height?: number}
+      | undefined;
     const w =
       props.originalWidth ??
       videoElRef.current?.videoWidth ??
-      mediaTextureState?.image?.width ??
+      textureImage?.width ??
       size.width;
     const h =
       props.originalHeight ??
       videoElRef.current?.videoHeight ??
-      mediaTextureState?.image?.height ??
+      textureImage?.height ??
       size.height;
 
     if (mat.uniforms.u_texel) {

@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {appStore} from '../../store/appStore';
 import {getVideoThumbnail} from '../../helpers/filter_helper';
-import ClipLoader from 'react-spinners/ClipLoader';
+import {ClipLoader} from 'react-spinners';
 import {FILTERS, CATEGORY_GRADIENTS} from '../../assets/filters/filterData';
 import type {FilterItem} from '../../types/filterTypes';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
@@ -78,7 +78,7 @@ export const FilterMenu = ({
       }
     };
 
-    loadThumbnail();
+    void loadThumbnail();
   }, [activeFile, thumbCache, setThumbCache, activeIndex]);
 
   const onSelectLut = async (filter: FilterItem | null) => {
@@ -135,7 +135,7 @@ export const FilterMenu = ({
         </button>
       </div>
 
-      <div className="mt-[-1rem] flex h-full w-full flex-col">
+      <div className="-mt-4 flex h-full w-full flex-col">
         <div className="w-full pt-0 pb-3 text-center">
           <h3
             className="text-lg font-medium"
@@ -151,7 +151,7 @@ export const FilterMenu = ({
             {FILTERS.map((filter: FilterItem, index) => (
               <div
                 key={`${filter.key}-${index}`}
-                className="flex flex-shrink-0 flex-col items-center">
+                className="flex shrink-0 flex-col items-center">
                 <button
                   className="relative flex transform touch-manipulation appearance-none flex-col items-center border-none bg-transparent p-0 transition-transform duration-180 ease-in-out select-none focus:outline-none active:scale-95"
                   onClick={() => onSelectLut(filter)}

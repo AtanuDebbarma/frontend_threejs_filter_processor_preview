@@ -37,7 +37,11 @@ export const MediaCanvas = ({
   const {ref: containerRef, size: containerSize} =
     useElementSize<HTMLDivElement>();
 
-  const adjustTransform = adjustByIndex[index] ?? defaultAdjustTransform;
+  const adjustEntry = adjustByIndex[index];
+  const bgColor =
+    adjustEntry?.id === id
+      ? adjustEntry.value.bgColor
+      : defaultAdjustTransform.bgColor;
   const files = () => {
     if (media) {
       return {uri: media.uri, width: media.width, height: media.height};
@@ -65,11 +69,9 @@ export const MediaCanvas = ({
   return (
     <div
       ref={containerRef}
-      className="h-full w-full origin-center overflow-hidden rounded-[8px]"
+      className="h-full w-full origin-center overflow-hidden rounded-lg"
       style={{
-        backgroundColor:
-          (adjustTransform.id === id && adjustTransform.value.bgColor) ||
-          '#000000',
+        backgroundColor: bgColor,
       }}>
       <Canvas
         id={`canvas-${aspectType}`}
