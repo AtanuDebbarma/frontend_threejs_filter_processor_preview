@@ -98,22 +98,6 @@ const App = (): React.JSX.Element => {
     };
   }, []);
 
-  // Shell ready before media: CAPABILITIES + WEB_READY (media arrives via HYDRATE postMessage only).
-  useEffect(() => {
-    if (!window.ReactNativeWebView) {
-      return;
-    }
-
-    const webCodecs = typeof VideoEncoder !== 'undefined';
-    window.ReactNativeWebView.postMessage(
-      JSON.stringify({
-        type: 'CAPABILITIES',
-        payload: {webCodecs},
-      }),
-    );
-    window.ReactNativeWebView.postMessage(JSON.stringify({type: 'WEB_READY'}));
-  }, []);
-
   const hydrationHandlers = React.useMemo(
     () => ({
       setMediaFiles,
@@ -124,6 +108,47 @@ const App = (): React.JSX.Element => {
     }),
     [setMediaFiles, setPost, setDpr],
   );
+
+  // Primary hydration: RN injects __EXPO_MEDIA__ + mediaReady before WEB_READY (develop flow).
+  useEffect(() => {
+    const listener = async () => {
+      const data = (window as any).__EXPO_MEDIA__ as
+        | HydrationPayload
+        | undefined;
+      if (!data?.file?.length) {
+        rnLogger.log('⚠️ No __EXPO_MEDIA__ found on window');
+        return;
+      }
+
+      applyLogConfigFromHydration(data.production);
+      rnLogger.log('📥 Processing injected hydration (mediaReady)');
+      await applyHydrationFromPayload(data, 'Injection', {
+        ...hydrationHandlers,
+      });
+
+      if (!window.ReactNativeWebView) {
+        return;
+      }
+
+      const webCodecs = typeof VideoEncoder !== 'undefined';
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          type: 'CAPABILITIES',
+          payload: {webCodecs},
+        }),
+      );
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({type: 'WEB_READY'}),
+      );
+    };
+
+    window.addEventListener('mediaReady', listener);
+    void listener();
+
+    return () => {
+      window.removeEventListener('mediaReady', listener);
+    };
+  }, [hydrationHandlers, applyLogConfigFromHydration]);
 
   useEffect(() => {
     // Handle messages from RN
