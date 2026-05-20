@@ -1,3 +1,6 @@
+# Windows: accidental file when shell redirects to `nul` instead of the NUL device
+nul
+
 # Logs
 logs
 *.log

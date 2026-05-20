@@ -1,7 +1,8 @@
 import React, {useEffect} from 'react';
 
 import {appStore} from './store/appStore';
-import {type FilterItem, type MediaFile} from './types/filterTypes';
+// import {type FilterItem, type MediaFile} from './types/filterTypes';
+import {type FilterItem} from './types/filterTypes';
 import MediaComponent from './components/Filters_And_MediaOutput/MediaComponent';
 // import VideoSRC from './assets/test.mp4';
 // import VideoSRC2 from './assets/ufc.mp4';
@@ -13,7 +14,11 @@ import {
   setupGlobalErrorHandling,
 } from './utils/rnLogger';
 import {ClipLoader} from 'react-spinners';
-import {applyHydrationData, trimBase64} from './helpers/other_helpers';
+import {applyHydrationFromPayload} from './helpers/hydrationBridge';
+import {
+  useEditorLogging,
+  SET_LOG_CONFIG_MESSAGE,
+} from './hooks/useEditorLogging';
 import {AudioMenu} from './components/Menus/AudioMenu';
 import BottomBar from './components/Menus/BottomBar';
 import {EditorMenu} from './components/Menus/EditorMenu';
@@ -26,30 +31,18 @@ import type {AdjustRecord} from './store/adjustSlice';
 import type {EditorRecord} from './store/editorSlice';
 import {normalizeForExport} from './helpers/exportHelpers';
 
-export type HydrationPayload = {
-  file: MediaFile[];
-  post: boolean;
-  dpr: number;
-  appColors: AppColors;
-  insets: Insets;
-};
-export type PatchPayload = {
-  requestedExport: boolean;
-  appColors: AppColors;
-  insets: Insets;
-};
-export type AppColors = {
-  backgroundColorMain: string;
-  bottomMenuBackground: string;
-  textColor: string;
-  buttonColor: string;
-};
-export type Insets = {
-  top: number;
-  bottom: number;
-  left: number;
-  right: number;
-};
+export type {
+  AppColors,
+  HydrationPayload,
+  Insets,
+  PatchPayload,
+} from './types/webBridgeTypes';
+import type {
+  AppColors,
+  HydrationPayload,
+  Insets,
+  PatchPayload,
+} from './types/webBridgeTypes';
 
 const App = (): React.JSX.Element => {
   const activeFilter: FilterItem = appStore(state => state.activeFilter);
@@ -89,6 +82,9 @@ const App = (): React.JSX.Element => {
   const buttonsOpen = activeButton !== null;
   const canvasSize = appStore(state => state.canvasSize);
 
+  const {handleRnMessage: handleLogConfigMessage, applyLogConfigFromHydration} =
+    useEditorLogging();
+
   // ✅ Setup logging and global error handling
   useEffect(() => {
     rnLogger.info('🚀 Media Filter App initializing...');
@@ -102,106 +98,32 @@ const App = (): React.JSX.Element => {
     };
   }, []);
 
-  // ✅ Mock: simulate RN sending files in browser
-  // useEffect(() => {
-  //   const mockMedia: MediaFile[] = [
-  //     {
-  //       id: '1',
-  //       uri: VideoSRC,
-  //       filename: 'sample',
-  //       mediaType: 'video',
-  //       width: 1080,
-  //       height: 1920,
-  //     },
-  //     {
-  //       id: '2',
-  //       uri: SRC2,
-  //       filename: 'sample2',
-  //       mediaType: 'photo',
-  //       width: 1080,
-  //       height: 1080,
-  //     },
-  //     {
-  //       id: '3',
-  //       uri: VideoSRC2,
-  //       filename: 'sample2',
-  //       mediaType: 'video',
-  //       width: 1080,
-  //       height: 1080,
-  //     },
-  //     {
-  //       id: '4',
-  //       uri: VideoSRC3,
-  //       filename: 'sample3',
-  //       mediaType: 'video',
-  //       width: 1080,
-  //       height: 1920,
-  //     },
-  //   ];
-
-  //   (window as any).__EXPO_MEDIA__ = {
-  //     file: mockMedia,
-  //     post: true,
-  //     dpr: window.devicePixelRatio || 2,
-  //     appColors: {
-  //       backgroundColorMain: 'rgba(227, 228, 231, 1)',
-  //       bottomMenuBackground: 'rgba(253, 253, 255, 1)',
-  //       textColor: 'rgba(0, 0, 0, 1)',
-  //       buttonColor: 'rgba(217, 217, 217, 1)',
-  //     },
-  //     insets: {
-  //       top: 0,
-  //       bottom: 16,
-  //       left: 0,
-  //       right: 0,
-  //     },
-  //   } satisfies HydrationPayload;
-
-  //   // simulate RN dispatch
-  //   window.dispatchEvent(new Event('mediaReady'));
-  // }, []);
-
+  // Shell ready before media: CAPABILITIES + WEB_READY (media arrives via HYDRATE postMessage only).
   useEffect(() => {
-    const listener = async () => {
-      const data: HydrationPayload = (window as any).__EXPO_MEDIA__;
-      if (!data) {
-        rnLogger.log('⚠️ No __EXPO_MEDIA__ found on window');
-        return;
-      }
-      const payload = trimBase64({files: data.file});
-      rnLogger.log(
-        '📥 Processing injected HYDRATE',
-        JSON.stringify(payload, null, 2),
-      );
-      await applyHydrationData(data, 'Injection', setMediaFiles, setPost);
-      if (data.appColors) {
-        setAppColors(data.appColors);
-      }
-      if (data.insets) {
-        setSafeInsets(data.insets);
-      }
-      if (data.dpr != null) {
-        setDpr(data.dpr);
-      }
+    if (!window.ReactNativeWebView) {
+      return;
+    }
 
-      // Notify RN that web is ready
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({type: 'WEB_READY'}),
-        );
-      }
-    };
-
-    window.addEventListener('mediaReady', listener);
-
-    // Also try to run immediately in case the event already fired
-    void listener();
-
-    return () => {
-      window.removeEventListener('mediaReady', listener);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const webCodecs = typeof VideoEncoder !== 'undefined';
+    window.ReactNativeWebView.postMessage(
+      JSON.stringify({
+        type: 'CAPABILITIES',
+        payload: {webCodecs},
+      }),
+    );
+    window.ReactNativeWebView.postMessage(JSON.stringify({type: 'WEB_READY'}));
   }, []);
+
+  const hydrationHandlers = React.useMemo(
+    () => ({
+      setMediaFiles,
+      setPost,
+      setAppColors,
+      setSafeInsets,
+      setDpr,
+    }),
+    [setMediaFiles, setPost, setDpr],
+  );
 
   useEffect(() => {
     // Handle messages from RN
@@ -213,9 +135,44 @@ const App = (): React.JSX.Element => {
           return;
         }
 
-        rnLogger.log('📨 Received message via document:', msg.type);
+        if (msg.type !== SET_LOG_CONFIG_MESSAGE) {
+          rnLogger.log('📨 Received message via document:', msg.type);
+        }
+
+        handleLogConfigMessage(msg);
 
         switch (msg.type) {
+          case SET_LOG_CONFIG_MESSAGE:
+            break;
+
+          case 'HYDRATE': {
+            const data = msg.payload as HydrationPayload | undefined;
+            if (!data?.file?.length) {
+              rnLogger.warn('⚠️ HYDRATE: missing or empty payload');
+              break;
+            }
+            rnLogger.log('📥 HYDRATE postMessage');
+            applyLogConfigFromHydration(data.production);
+            void applyHydrationFromPayload(data, 'HYDRATE postMessage', {
+              ...hydrationHandlers,
+            });
+            break;
+          }
+
+          case 'UPDATE_ASSETS': {
+            const data = msg.payload as HydrationPayload | undefined;
+            if (!data?.file?.length) {
+              rnLogger.warn('⚠️ UPDATE_ASSETS: missing or empty payload');
+              break;
+            }
+            rnLogger.log('📥 UPDATE_ASSETS postMessage');
+            applyLogConfigFromHydration(data.production);
+            void applyHydrationFromPayload(data, 'UPDATE_ASSETS', {
+              ...hydrationHandlers,
+            });
+            break;
+          }
+
           case 'PATCH_STATE': {
             const data: PatchPayload = msg.payload;
             rnLogger.log('🎨 PATCH_STATE update:', data);
@@ -259,8 +216,14 @@ const App = (): React.JSX.Element => {
     return () => {
       document.removeEventListener('message', handleDocumentMessage as any);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [
+    hydrationHandlers,
+    handleLogConfigMessage,
+    applyLogConfigFromHydration,
+    setIsModalOpen,
+    setRequestedExport,
+    setRequestedSave,
+  ]);
 
   useEffect(() => {
     rnLogger.log('🎨 Active filter changed:', activeFilter);

@@ -1,17 +1,19 @@
 {
   "name": "frontend_threejs_filter_processor_preview",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "author": "Atanu Debbarma",
   "license": "Proprietary Mobeet Technologies PVT LTD",
   "scripts": {
     "dev": "bunx vite",
-    "build": "bunx tsc -b && bunx vite build",
+    "build": "bunx tsc -b && bunx vite build && node scripts/generate-manifest.mjs",
     "lint": "bunx eslint .",
     "format": "bunx prettier --write \"src/**/*.{js,jsx,ts,tsx,css,scss}\"",
     "preview": "bunx vite preview",
     "tsc": "bunx tsc --noEmit",
+    "pages:copy": "node scripts/copy-pages.mjs",
+    "pages:publish": "bun run build && bun run pages:copy",
     "allow-scripts": "allow-scripts auto"
   },
   "dependencies": {
@@ -83,6 +85,6 @@
     "picomatch": "4.0.4",
     "protobufjs": "7.5.6",
     "minimatch": "10.2.4",
-    "brace-expansion": "5.0.5"
+    "brace-expansion": "5.0.6"
   }
 }

@@ -7,7 +7,7 @@ import type {ColorBalance, Curve, FilterItem} from '../../types/filterTypes';
 import {scheduleClearApplying} from '../../utils/filter_utils';
 import {vertexShader, fragmentShader} from '../../assets/shaders';
 import {rnLogger} from '../../utils/rnLogger';
-import {trimBase64} from '../../helpers/other_helpers';
+import {trimUriForLog} from '../../helpers/other_helpers';
 import {defaultEditor, type EditorRecord} from '../../store/editorSlice';
 import {defaultAdjustTransform} from '../../store/adjustSlice';
 
@@ -120,7 +120,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   }, [gl]);
 
   useEffect(() => {
-    const trimmedUri = trimBase64({singleFile: props.uri});
+    const trimmedUri = trimUriForLog({singleFile: props.uri});
     rnLogger.componentLog(
       'FilteredMedia',
       'log',

@@ -1,7 +1,7 @@
 // src/hooks/useVerifiedMediaFiles.ts
 import {useEffect, useRef, useState} from 'react';
 import {rnLogger} from '../utils/rnLogger';
-import {trimBase64} from '../helpers/other_helpers';
+import {trimUriForLog} from '../helpers/other_helpers';
 
 export type AspectType = 'square' | 'landscape' | 'vertical';
 
@@ -36,6 +36,10 @@ const isRNLocalUrl = (url: string) =>
   url.startsWith('file:') ||
   url.startsWith('content:') ||
   url.startsWith('ph:');
+
+/** Loopback static server (Phase 4 RN) — fetch like remote, then blob URL. */
+const isLocalhostMediaUrl = (url: string): boolean =>
+  /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(url);
 
 /** Vite dev/build asset paths (e.g. `/src/assets/foo.mp4` from `import url`) */
 const isBundledAssetUrl = (url: string) =>
@@ -73,15 +77,21 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
         };
       }
 
-      // 🌐 Remote URL → fetch and wrap in blob URL (skip for blob/data/RN/bundled Vite assets)
-      if (!isBlobUrl(uri) && !isBundledAssetUrl(uri)) {
+      // 🌐 Remote / localhost static server → fetch and wrap in blob URL
+      if (!isBlobUrl(uri) && !isBundledAssetUrl(uri) && !isRNLocalUrl(uri)) {
         try {
+          if (isLocalhostMediaUrl(uri)) {
+            rnLogger.log(`🌐 Fetching localhost media: ${uri}`);
+          }
           const res = await fetch(uri);
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
           const blob = await res.blob();
           uri = URL.createObjectURL(blob);
           createdUrlsRef.current.push(uri);
         } catch (err) {
-          const trimmedUri = trimBase64({singleFile: uri});
+          const trimmedUri = trimUriForLog({singleFile: uri});
           rnLogger.warn(`❌ Failed to fetch media URI: ${trimmedUri}`, err);
         }
       }
@@ -129,7 +139,7 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
           v.addEventListener(
             'error',
             () => {
-              const trimmedUri = trimBase64({singleFile: uri});
+              const trimmedUri = trimUriForLog({singleFile: uri});
               rnLogger.warn(`❌ Failed to load video metadata: ${trimmedUri}`);
               resolve({
                 ...file,
@@ -180,7 +190,7 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
         };
 
         img.onerror = () => {
-          const trimmedUri = trimBase64({singleFile: file.uri});
+          const trimmedUri = trimUriForLog({singleFile: file.uri});
           rnLogger.warn(`❌ Failed to load image metadata: ${trimmedUri}`);
           resolve({
             ...file,

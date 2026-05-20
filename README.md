@@ -4,7 +4,7 @@ Production WebView bundle for the **Mobeet** create-post flow. It provides real-
 
 This package is **not** a standalone product. It ships as a single-file `index.html` (Vite + `vite-plugin-singlefile`), delivered to the app over the air and loaded from disk — not bundled inside the APK/IPA.
 
-**Planning docs:** [`../plan_docs/CreatePost_MediaEditor_Tasks.md`](../plan_docs/CreatePost_MediaEditor_Tasks.md), [`../plan_docs/Technical_Requirements.md`](../plan_docs/Technical_Requirements.md)
+**Planning docs:** [`../mbt/docs/createPost/CreatePost_MediaEditor_Tasks.md`](../mbt/docs/createPost/CreatePost_MediaEditor_Tasks.md), [`../plan_docs/Technical_Requirements.md`](../plan_docs/Technical_Requirements.md)
 
 ## Table of contents
 
@@ -26,7 +26,7 @@ This package is **not** a standalone product. It ships as a single-file `index.h
 | Aspect | Detail |
 | ------ | ------ |
 | **Host** | Mobeet Expo app (`mbt/`) — `MediaProcessorMain` WebView |
-| **Delivery** | GitHub Pages `index.html` + `manifest.json`; RN `editorUpdater` caches to sandbox; WebView `source={{ uri: file://... }}` |
+| **Delivery** | GitHub Pages (`docs/` on branch) → `index.html` + `manifest.json`; RN `editorUpdater` caches to sandbox; WebView `source={{ uri: file://... }}` |
 | **Preview** | Three.js / React Three Fiber + GLSL shaders on photos and video |
 | **Export** | In-WebView encode (WebCodecs for video, `canvas.toBlob` for images) — **not** native FFmpeg / `VideoProcessor` |
 | **Build output** | One self-contained `index.html` (JS, CSS, fonts, assets inlined) |
@@ -148,18 +148,49 @@ For real media, filters, and bridge behavior, test inside the **mbt** dev client
 
 Optional: uncomment mock hydration in `App.tsx` for isolated browser testing (not a substitute for RN integration).
 
+## Hosting (Vercel recommended for private repos)
+
+Build locally; deploy **`docs/`** to **Vercel** (or any static host). GitHub Actions deploy was removed to save CI minutes.
+
+**Full steps (Vercel project, WAF bypass, Bot Protection, headers):**  
+[`docs/VERCEL_FIREWALL_SETUP.md`](docs/VERCEL_FIREWALL_SETUP.md)
+
+**`mbt/.env` (after Vercel deploy):**
+
+```env
+EXPO_PUBLIC_EDITOR_MANIFEST_URL=https://your-project.vercel.app/manifest.json
+EXPO_PUBLIC_EDITOR_OTA_KEY=<same-secret-as-vercel-waf-bypass-rule>
+```
+
+The app sends header `X-Mobeet-Editor-Client` on manifest/HTML fetch (see `editorUpdater.ts`).
+
+### Publish a new editor version
+
+```bash
+bun run pages:publish    # build + copy dist → docs/ (incl. robots.txt)
+git add docs/
+git commit -m "chore(editor): publish pages 0.0.x"
+git push
+```
+
+Bump **`version`** in `package.json` before publish when you want the app OTA to pick up a new bundle.
+
 ## Scripts
 
 | Script | Command |
 | ------ | ------- |
 | Dev server | `bun run dev` |
 | Production build | `bun run build` |
+| Copy build to `docs/` | `bun run pages:copy` |
+| Build + copy (publish prep) | `bun run pages:publish` |
 | Typecheck | `bun run tsc` |
 | Lint | `bun run lint` |
 | Format | `bun run format` |
 | Preview build | `bun run preview` |
 
 Before a PR: run **`bun run tsc`** and **`bun run lint`**.
+
+**Note:** `docs/` contains generated ~2MB `index.html` — commit it only when publishing to Pages.
 
 ## Project status
 
