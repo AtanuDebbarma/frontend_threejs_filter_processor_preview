@@ -98,6 +98,20 @@ const App = (): React.JSX.Element => {
     };
   }, []);
 
+  // Capability probe (hidden WebView, no __EXPO_MEDIA__): RN CreatePostMainFooter listens for this only.
+  useEffect(() => {
+    if (!window.ReactNativeWebView) {
+      return;
+    }
+    const webCodecs = typeof VideoEncoder !== 'undefined';
+    window.ReactNativeWebView.postMessage(
+      JSON.stringify({
+        type: 'CAPABILITIES',
+        payload: {webCodecs},
+      }),
+    );
+  }, []);
+
   const hydrationHandlers = React.useMemo(
     () => ({
       setMediaFiles,
