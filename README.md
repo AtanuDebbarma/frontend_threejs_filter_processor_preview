@@ -148,37 +148,30 @@ For real media, filters, and bridge behavior, test inside the **mbt** dev client
 
 Optional: uncomment mock hydration in `App.tsx` for isolated browser testing (not a substitute for RN integration).
 
-## GitHub Pages (manual — no Actions)
+## Hosting (Vercel recommended for private repos)
 
-This repo does **not** use GitHub Actions to deploy (saves CI minutes). You build locally and commit the static site under **`docs/`**.
+Build locally; deploy **`docs/`** to **Vercel** (or any static host). GitHub Actions deploy was removed to save CI minutes.
 
-### One-time GitHub settings
+**Full steps (Vercel project, WAF bypass, Bot Protection, headers):**  
+[`docs/VERCEL_FIREWALL_SETUP.md`](docs/VERCEL_FIREWALL_SETUP.md)
 
-1. Repo → **Settings** → **Pages**
-2. **Build and deployment** → Source: **Deploy from a branch**
-3. **Branch:** `crate_post_revamp` (or `master` later) → **Folder:** `/docs`
-4. Save. Site URL (project repo):
+**`mbt/.env` (after Vercel deploy):**
 
-   `https://<github-user>.github.io/frontend_threejs_filter_processor_preview/`
+```env
+EXPO_PUBLIC_EDITOR_MANIFEST_URL=https://your-project.vercel.app/manifest.json
+EXPO_PUBLIC_EDITOR_OTA_KEY=<same-secret-as-vercel-waf-bypass-rule>
+```
 
-5. In **`mbt/.env`** (not this repo):
-
-   ```env
-   EXPO_PUBLIC_EDITOR_MANIFEST_URL=https://<github-user>.github.io/frontend_threejs_filter_processor_preview/manifest.json
-   ```
-
-You can switch the Pages branch to `master` anytime in Settings after merge.
+The app sends header `X-Mobeet-Editor-Client` on manifest/HTML fetch (see `editorUpdater.ts`).
 
 ### Publish a new editor version
 
 ```bash
-bun run pages:publish    # build + copy dist → docs/
+bun run pages:publish    # build + copy dist → docs/ (incl. robots.txt)
 git add docs/
 git commit -m "chore(editor): publish pages 0.0.x"
-git push origin crate_post_revamp
+git push
 ```
-
-Wait ~1–2 minutes, then open `…/manifest.json` in the browser to confirm.
 
 Bump **`version`** in `package.json` before publish when you want the app OTA to pick up a new bundle.
 
