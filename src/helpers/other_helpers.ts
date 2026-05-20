@@ -1,6 +1,6 @@
 // src/helpers/helpers.ts
 
-import type {HydrationPayload} from '../App';
+import type {HydrationPayload} from '../types/webBridgeTypes';
 import type {MediaItem} from '../hooks/useVerifiedMediaFiles';
 import {type MediaFile} from '../types/filterTypes';
 import {rnLogger} from '../utils/rnLogger';
@@ -13,13 +13,8 @@ type TrimParams = {
   singleFile?: string;
 };
 
-/**
- * Trim base64 encoded strings (e.g. image/video URIs) to a shorter length.
- * This is useful for displaying URIs in the UI without overwhelming the user.
- * @param {TrimParams} params - an object containing either `files`, `mediItems`, or `singleFile` property.
- * @returns {MediaFile[] | MediaItem[] | string | undefined} - the trimmed base64 encoded string(s) or undefined if no valid property is provided.
- */
-export const trimBase64 = ({
+/** Shorten long `data:` URIs in logs; http/file/blob URIs are logged as-is. */
+export const trimUriForLog = ({
   files,
   mediItems,
   singleFile,
@@ -71,7 +66,7 @@ export const applyHydrationData = async (
   setMediaFiles: (files: MediaFile[] | []) => void,
   setPost: React.Dispatch<React.SetStateAction<boolean>>,
 ) => {
-  const payload = trimBase64({files: data.file});
+  const payload = trimUriForLog({files: data.file});
   rnLogger.log(`📥 Applying HYDRATE from ${source}:`, payload);
 
   setMediaFiles(data.file ?? []);

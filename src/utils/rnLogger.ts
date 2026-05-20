@@ -1,47 +1,75 @@
 // src/utils/rnLogger.ts
+export type EditorLoggingConfig = {
+  /** When true, logs are not forwarded to RN via postMessage. */
+  production: boolean;
+};
+
 interface LogData {
   level: 'log' | 'warn' | 'error' | 'info' | 'debug';
   message: string;
-  args?: any[];
+  args?: unknown[];
   timestamp: number;
   component?: string;
   stack?: string;
 }
 
-class RNLogger {
-  private isRNEnvironment: boolean;
+let loggingConfig: EditorLoggingConfig = {production: true};
 
-  constructor() {
-    // Detect if running in RN WebView
-    this.isRNEnvironment =
-      typeof window !== 'undefined' &&
-      (window as any).ReactNativeWebView !== undefined;
+export const configureEditorLogging = (config: EditorLoggingConfig): void => {
+  loggingConfig = config;
+};
+
+export const getEditorLoggingConfig = (): EditorLoggingConfig => ({
+  ...loggingConfig,
+});
+
+const shouldForwardToRN = (): boolean => {
+  if (loggingConfig.production) {
+    return false;
   }
+  return (
+    typeof window !== 'undefined' &&
+    (
+      window as Window & {
+        ReactNativeWebView?: {postMessage: (s: string) => void};
+      }
+    ).ReactNativeWebView !== undefined
+  );
+};
 
+class RNLogger {
   private sendToRN(logData: LogData) {
-    if (!this.isRNEnvironment) return;
+    if (!shouldForwardToRN()) {
+      return;
+    }
 
     try {
-      // Send via postMessage to React Native
       const message = {
         type: 'WEB_LOG',
         payload: logData,
       };
 
-      if ((window as any).ReactNativeWebView?.postMessage) {
-        (window as any).ReactNativeWebView.postMessage(JSON.stringify(message));
+      const bridge = (
+        window as Window & {
+          ReactNativeWebView?: {postMessage: (s: string) => void};
+        }
+      ).ReactNativeWebView;
+
+      if (bridge?.postMessage) {
+        bridge.postMessage(JSON.stringify(message));
       } else if (window.parent && window.parent !== window) {
-        // Fallback for other WebView implementations
         window.parent.postMessage(message, '*');
       }
     } catch (error) {
-      // Fallback to regular console if RN bridge fails
-      console.error('Failed to send log to RN:', error);
+      const originalError =
+        (console as Console & {_originalError?: typeof console.error})
+          ._originalError ?? console.error;
+      originalError.call(console, 'Failed to send log to RN:', error);
     }
   }
 
   private createLogMethod(level: LogData['level']) {
-    return (message: string, ...args: any[]) => {
+    return (message: string, ...args: unknown[]) => {
       const logData: LogData = {
         level,
         message,
@@ -50,14 +78,12 @@ class RNLogger {
         stack: level === 'error' ? new Error().stack : undefined,
       };
 
-      // Always log to browser console
       const originalConsole =
-        (console as any)[
+        (console as Console & Record<string, typeof console.log>)[
           `_original${level.charAt(0).toUpperCase() + level.slice(1)}`
         ] || console[level];
       originalConsole.call(console, `[WEB] ${message}`, ...args);
 
-      // Send to RN if available
       this.sendToRN(logData);
     };
   }
@@ -68,12 +94,11 @@ class RNLogger {
   public error = this.createLogMethod('error');
   public debug = this.createLogMethod('debug');
 
-  // Component-specific logging
   public componentLog(
     component: string,
     level: LogData['level'],
     message: string,
-    ...args: any[]
+    ...args: unknown[]
   ) {
     const logData: LogData = {
       level,
@@ -84,33 +109,32 @@ class RNLogger {
       stack: level === 'error' ? new Error().stack : undefined,
     };
 
-    // Browser console with component prefix
     const originalConsole =
-      (console as any)[
+      (console as Console & Record<string, typeof console.log>)[
         `_original${level.charAt(0).toUpperCase() + level.slice(1)}`
       ] || console[level];
     originalConsole.call(console, `[WEB:${component}] ${message}`, ...args);
 
-    // Send to RN
     this.sendToRN(logData);
   }
 }
 
-// Create singleton instance
 export const rnLogger = new RNLogger();
 
-// Override console methods to intercept all logs
 export const setupConsoleInterception = () => {
   const originalConsole = {...console};
 
-  // Store original methods
-  (console as any)._originalLog = originalConsole.log;
-  (console as any)._originalWarn = originalConsole.warn;
-  (console as any)._originalError = originalConsole.error;
-  (console as any)._originalInfo = originalConsole.info;
-  (console as any)._originalDebug = originalConsole.debug;
+  (console as Console & Record<string, unknown>)._originalLog =
+    originalConsole.log;
+  (console as Console & Record<string, unknown>)._originalWarn =
+    originalConsole.warn;
+  (console as Console & Record<string, unknown>)._originalError =
+    originalConsole.error;
+  (console as Console & Record<string, unknown>)._originalInfo =
+    originalConsole.info;
+  (console as Console & Record<string, unknown>)._originalDebug =
+    originalConsole.debug;
 
-  // Override console methods
   console.log = rnLogger.log;
   console.warn = rnLogger.warn;
   console.error = rnLogger.error;
@@ -118,7 +142,6 @@ export const setupConsoleInterception = () => {
   console.debug = rnLogger.debug;
 
   return () => {
-    // Restore original console methods
     console.log = originalConsole.log;
     console.warn = originalConsole.warn;
     console.error = originalConsole.error;
@@ -127,7 +150,6 @@ export const setupConsoleInterception = () => {
   };
 };
 
-// Error boundary helper
 export const captureError = (
   error: Error,
   componentStack?: string,
@@ -143,12 +165,22 @@ export const captureError = (
   };
 
   console.error(`[WEB:ERROR] ${logData.message}`, error);
-  rnLogger['sendToRN'](logData);
+
+  if (shouldForwardToRN()) {
+    try {
+      const bridge = (
+        window as Window & {
+          ReactNativeWebView?: {postMessage: (s: string) => void};
+        }
+      ).ReactNativeWebView;
+      bridge?.postMessage(JSON.stringify({type: 'WEB_LOG', payload: logData}));
+    } catch {
+      /* ignore bridge errors */
+    }
+  }
 };
 
-// Global error handler
 export const setupGlobalErrorHandling = () => {
-  // Handle unhandled promise rejections
   window.addEventListener('unhandledrejection', event => {
     rnLogger.error('Unhandled Promise Rejection:', event.reason);
     captureError(
@@ -158,7 +190,6 @@ export const setupGlobalErrorHandling = () => {
     );
   });
 
-  // Handle uncaught errors
   window.addEventListener('error', event => {
     rnLogger.error('Uncaught Error:', event.error || event.message);
     captureError(
