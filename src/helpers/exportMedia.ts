@@ -2,11 +2,15 @@ import {getExportCanvas} from './exportCanvasRegistry';
 import {appStore} from '../store/appStore';
 import {defaultAdjustTransform} from '../store/adjustSlice';
 import {rnLogger} from '../utils/rnLogger';
+import {blitCanvasToExportSize} from './exportBlit';
+import {exportVideoMp4} from './exportVideoMp4';
 import {
-  TARGET_DIMENSIONS,
+  resolveExportDimensions,
   type ExportMode,
   type SaveExportDataPayload,
 } from './exportTypes';
+
+export {blitCanvasToExportSize} from './exportBlit';
 
 const blobToBase64 = (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -25,42 +29,13 @@ const blobToBase64 = (blob: Blob): Promise<string> =>
     reader.readAsDataURL(blob);
   });
 
-/** Cover-fit WebGL canvas into fixed 4:5 export framebuffer (preview parity). */
-export const blitCanvasToExportSize = (
-  source: HTMLCanvasElement,
-  targetWidth: number,
-  targetHeight: number,
-  backgroundColor: string,
-): HTMLCanvasElement => {
-  const out = document.createElement('canvas');
-  out.width = targetWidth;
-  out.height = targetHeight;
-  const ctx = out.getContext('2d');
-  if (!ctx) {
-    throw new Error('2D canvas unavailable for export');
-  }
-
-  ctx.fillStyle = backgroundColor;
-  ctx.fillRect(0, 0, targetWidth, targetHeight);
-
-  const sw = Math.max(1, source.width);
-  const sh = Math.max(1, source.height);
-  const scale = Math.max(targetWidth / sw, targetHeight / sh);
-  const dw = sw * scale;
-  const dh = sh * scale;
-  const ox = (targetWidth - dw) / 2;
-  const oy = (targetHeight - dh) / 2;
-
-  ctx.drawImage(source, ox, oy, dw, dh);
-  return out;
-};
-
 export const captureExportBlob = async (
   sourceCanvas: HTMLCanvasElement,
   targetWidth: number,
   targetHeight: number,
   backgroundColor: string,
   mediaType: 'photo' | 'video',
+  index: number,
 ): Promise<Blob> => {
   const framed = blitCanvasToExportSize(
     sourceCanvas,
@@ -85,15 +60,27 @@ export const captureExportBlob = async (
     });
   }
 
-  throw new Error(
-    'Video save export is not implemented yet — test Save with a photo first.',
-  );
+  const state = appStore.getState();
+  const muted = state.videoMutedState[index]?.muted ?? false;
+  const media = state.mediaFiles[index];
+  if (!media?.uri) {
+    throw new Error('Video URI missing for export');
+  }
+
+  return exportVideoMp4({
+    index,
+    uri: media.uri,
+    width: targetWidth,
+    height: targetHeight,
+    backgroundColor,
+    muted,
+  });
 };
 
 export type ExportActiveSlideResult = SaveExportDataPayload;
 
 /**
- * Encodes the active carousel slide at post dimensions (864×1080).
+ * Encodes the active carousel slide at export dimensions (see resolveExportDimensions).
  * Uses the live R3F canvas (filters + adjust already applied).
  */
 export const exportActiveSlideForGallery = async (
@@ -114,7 +101,14 @@ export const exportActiveSlideForGallery = async (
     );
   }
 
-  const {width, height} = TARGET_DIMENSIONS[mode];
+  const videoCount = state.mediaFiles.filter(
+    f => f.mediaType === 'video',
+  ).length;
+  const {width, height} = resolveExportDimensions(
+    mode,
+    media.mediaType,
+    videoCount,
+  );
   const adjust = state.adjustByIndex[index]?.value ?? defaultAdjustTransform;
   const bgColor = adjust.bgColor ?? defaultAdjustTransform.bgColor;
 
@@ -128,6 +122,7 @@ export const exportActiveSlideForGallery = async (
     height,
     bgColor,
     media.mediaType,
+    index,
   );
 
   const exportBase64 = await blobToBase64(blob);
@@ -147,6 +142,9 @@ export const exportActiveSlideForGallery = async (
     exportBase64,
     mediaType: media.mediaType,
     filename,
-    mimeType: blob.type || 'image/jpeg',
+    mimeType:
+      blob.type || (media.mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
+    width,
+    height,
   };
 };
