@@ -24,6 +24,8 @@ export type FileSliceType = {
   setVideoMutedState: (index: number, id: string, muted: boolean) => void;
   dpr: number | null;
   setDpr: (dpr: number) => void;
+  isSaveExporting: boolean;
+  setIsSaveExporting: (exporting: boolean) => void;
 };
 
 export const createFileSlice: StateCreator<
@@ -41,6 +43,11 @@ export const createFileSlice: StateCreator<
   setDpr: (dpr: number) =>
     set(state => {
       state.dpr = dpr;
+    }),
+  isSaveExporting: false,
+  setIsSaveExporting: exporting =>
+    set(state => {
+      state.isSaveExporting = exporting;
     }),
 
   /**

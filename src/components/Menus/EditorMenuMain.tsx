@@ -9,6 +9,7 @@ import {
   faFileExport,
 } from '@fortawesome/free-solid-svg-icons';
 import type {AppColors, Insets} from '../../App';
+import {requestSaveToDevice} from '../../helpers/saveBridge';
 type Props = {
   appColors: AppColors;
   safeInsets: Insets;
@@ -21,7 +22,7 @@ export const EditorMenuMain = ({
   const mediaFiles = appStore(state => state.mediaFiles);
   const activeIndex = appStore(state => state.activeIndex);
   const setActiveButton = appStore(state => state.setActiveButton);
-  const setRequestedSave = appStore(state => state.setRequestedSave);
+  const isSaveExporting = appStore(state => state.isSaveExporting);
 
   const currentID = useMemo(() => {
     return mediaFiles[activeIndex]?.id;
@@ -38,8 +39,15 @@ export const EditorMenuMain = ({
   };
   const handleSave = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
+    if (!currentID || isSaveExporting) {
+      return;
+    }
     setTimeout(() => {
-      setRequestedSave(currentID, true);
+      try {
+        requestSaveToDevice(currentID, activeIndex);
+      } catch (err) {
+        console.error('Save request failed:', err);
+      }
     }, 200);
   };
 
@@ -100,7 +108,8 @@ export const EditorMenuMain = ({
         </button>
         <button
           onClick={e => handleSave(e)}
-          className="mx-1.5 flex flex-1 flex-col items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-3 shadow-sm transition-opacity duration-180 active:opacity-50"
+          disabled={isSaveExporting || !currentID}
+          className="mx-1.5 flex flex-1 flex-col items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-3 shadow-sm transition-opacity duration-180 active:opacity-50 disabled:opacity-40"
           style={{
             color: appColors.textColor,
             backgroundColor: appColors.buttonColor,
