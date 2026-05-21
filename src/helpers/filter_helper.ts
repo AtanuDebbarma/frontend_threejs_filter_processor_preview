@@ -1,6 +1,14 @@
 // src/helpers/filter_helper.ts
 import {rnLogger} from '../utils/rnLogger';
 
+/** URIs the <video> element can load without fetch (RN hydration uses file:// for videos). */
+const isDirectVideoSrc = (uri: string): boolean =>
+  uri.startsWith('blob:') ||
+  uri.startsWith('data:') ||
+  uri.startsWith('file:') ||
+  uri.startsWith('content:') ||
+  uri.startsWith('ph:');
+
 /**
  * Get (or return cached) video thumbnail for a given media index.
  * Caches the generated thumbnail (dataURL) in thumbCache Map.
@@ -34,20 +42,21 @@ export const getVideoThumbnail = async (
   let createdObjectUrl: string | null = null;
 
   try {
-    // Handle remote URIs → fetch blob → object URL
-    if (!uri.startsWith('blob:') && !uri.startsWith('data:')) {
+    // http(s) / localhost only — fetch → blob URL. file:// must not use fetch (fails in WebView).
+    if (!isDirectVideoSrc(uri)) {
       const res = await fetch(uri);
-      if (!res.ok) throw new Error(`Failed to fetch video: ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch video: ${res.status}`);
+      }
       const blob = await res.blob();
       sourceUri = URL.createObjectURL(blob);
       createdObjectUrl = sourceUri;
     }
 
-    // Setup video
     video.src = sourceUri;
     video.preload = 'metadata';
     video.muted = true;
-    (video as any).playsInline = true;
+    video.playsInline = true;
 
     // Wait for metadata
     await new Promise<void>((resolve, reject) => {

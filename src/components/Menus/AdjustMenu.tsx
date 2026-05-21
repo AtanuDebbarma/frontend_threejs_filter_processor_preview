@@ -8,7 +8,6 @@ import {ClipLoader} from 'react-spinners';
 import {useGesture} from '@use-gesture/react';
 import {useElementSize} from '../../hooks/useElementSize';
 import Sketch from '@uiw/react-color-sketch';
-import {mat4} from 'gl-matrix';
 import {
   defaultAdjustTransform,
   type AdjustRecord,
@@ -167,6 +166,14 @@ export const AdjustMenu = ({
     };
   }, [activeFile, activeIndex, thumbCache, setThumbCache]);
 
+  const isPhotoSlide = activeFile?.mediaType === 'photo';
+
+  useEffect(() => {
+    if (activeFile?.mediaType === 'video' && tagMode) {
+      setTagMode(false);
+    }
+  }, [activeFile?.mediaType, activeFile?.id, tagMode, setTagMode]);
+
   // Listen for messages from React Native
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -241,7 +248,7 @@ export const AdjustMenu = ({
           }
         : undefined,
       onClick:
-        tagMode && !isModalOpen
+        tagMode && !isModalOpen && isPhotoSlide
           ? ({event}) => {
               if (!previewRef.current || isTagSelectionLocked) return;
 
@@ -350,74 +357,13 @@ export const AdjustMenu = ({
 
   const handleConfirm = () => {
     if (activeFile?.width && activeFile?.height) {
-      const targetWidth = 1080;
-      const targetHeight = post ? 1350 : 1920;
-      const targetAspect = targetWidth / targetHeight;
-      const mediaAspect = activeFile.width / activeFile.height;
-
-      const projection = mat4.create();
-      mat4.ortho(projection, -1, 1, -1, 1, -1, 1);
-
-      // ✅ IMPROVED: Handle both wide and tall images
-      let quadScaleX = 1.0;
-      let quadScaleY = 1.0;
-
-      if (mediaAspect > targetAspect) {
-        // Wide image in tall container (e.g., 16:9 image in 4:5 post)
-        quadScaleX = mediaAspect / targetAspect;
-        quadScaleY = 1.0;
-        if (quadScaleX > 1.0) {
-          quadScaleY = 1.0 / quadScaleX;
-          quadScaleX = 1.0;
-        }
-      } else {
-        // Tall image in wide container (e.g., 4:5 image in 16:9 story)
-        quadScaleY = targetAspect / mediaAspect;
-        quadScaleX = 1.0;
-        if (quadScaleY > 1.0) {
-          quadScaleX = 1.0 / quadScaleY;
-          quadScaleY = 1.0;
-        }
-      }
-
-      const scaleFactorX = targetWidth / activeFile.width;
-      const scaleFactorY = targetHeight / activeFile.height;
-
-      const worldX = position.x;
-      const worldY = position.y;
-
-      const normalizedX = ((worldX * scaleFactorX) / targetWidth) * 2.0;
-      const normalizedY = -((worldY * scaleFactorY) / targetHeight) * 2.0;
-
-      const rotRad = -(rotation * Math.PI) / 180.0;
-
-      const model = mat4.create();
-      mat4.translate(model, model, [normalizedX, normalizedY, 0]);
-      mat4.rotateZ(model, model, rotRad);
-      mat4.scale(model, model, [scale * quadScaleX, scale * quadScaleY, 1]);
-
-      const mvp = mat4.create();
-      mat4.multiply(mvp, projection, model);
-
       setAdjustTransform(activeIndex, currentActiveId, {
         x: position.x / activeFile.width,
         y: position.y / activeFile.height,
         scale: scale,
         rotation: rotation,
         bgColor: localBgColor,
-        mvp: Array.from(mvp),
       });
-
-      rnLogger.log('✅ MVP Matrix (Export Space):', mvp);
-      rnLogger.log(
-        `Target: ${targetWidth}×${targetHeight}, Media: ${activeFile.width}×${activeFile.height}`,
-      );
-      rnLogger.log(
-        `Aspect: media=${mediaAspect.toFixed(3)}, target=${targetAspect.toFixed(3)}`,
-      );
-      rnLogger.log(
-        `QuadScale: X=${quadScaleX.toFixed(3)}, Y=${quadScaleY.toFixed(3)}`,
-      );
     }
 
     setTimeout(() => {
@@ -509,33 +455,34 @@ export const AdjustMenu = ({
           <p className="text-white">No media</p>
         )}
 
-        {/* Tags rendered inside preview container */}
-        {tagValuesByIndex[activeIndex].tags?.map(tag => (
-          <div
-            key={tag.id}
-            className="absolute flex items-center rounded-full bg-black/60 px-3 py-2 text-sm text-white shadow-md backdrop-blur-sm transition-all duration-200 ease-in-out hover:bg-black/90"
-            style={{
-              left: `${tag.x * 100}%`,
-              top: `${tag.y * 100}%`,
-              transform: 'translate(-50%, -50%)',
-              zIndex: tag.z || 1,
-              animation: 'fadeInTag 0.25s ease-out',
-              pointerEvents: 'auto',
-            }}>
-            <span className="mr-1 max-w-25 min-w-7.5 truncate overflow-hidden font-medium text-ellipsis whitespace-nowrap">
-              {tag.username ? `${tag.username}` : ''}
-            </span>
-            <button
-              onClick={e => {
-                e.stopPropagation();
-                handleManualCancel(currentActiveId, tag.id);
-                removeTagAtIndex(activeIndex, currentActiveId, tag.id);
-              }}
-              className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-700 text-[10px] text-white transition-transform duration-150 hover:bg-red-500 active:scale-90">
-              <FontAwesomeIcon icon={faXmark} />
-            </button>
-          </div>
-        ))}
+        {/* Position tags — images only (not video adjust preview) */}
+        {isPhotoSlide &&
+          tagValuesByIndex[activeIndex].tags?.map(tag => (
+            <div
+              key={tag.id}
+              className="absolute flex items-center rounded-full bg-black/60 px-3 py-2 text-sm text-white shadow-md backdrop-blur-sm transition-all duration-200 ease-in-out hover:bg-black/90"
+              style={{
+                left: `${tag.x * 100}%`,
+                top: `${tag.y * 100}%`,
+                transform: 'translate(-50%, -50%)',
+                zIndex: tag.z || 1,
+                animation: 'fadeInTag 0.25s ease-out',
+                pointerEvents: 'auto',
+              }}>
+              <span className="mr-1 max-w-25 min-w-7.5 truncate overflow-hidden font-medium text-ellipsis whitespace-nowrap">
+                {tag.username ? `${tag.username}` : ''}
+              </span>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  handleManualCancel(currentActiveId, tag.id);
+                  removeTagAtIndex(activeIndex, currentActiveId, tag.id);
+                }}
+                className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-700 text-[10px] text-white transition-transform duration-150 hover:bg-red-500 active:scale-90">
+                <FontAwesomeIcon icon={faXmark} />
+              </button>
+            </div>
+          ))}
       </div>
 
       {!tagMode && (
