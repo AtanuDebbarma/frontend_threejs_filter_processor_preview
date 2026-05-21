@@ -8,6 +8,7 @@ import {scheduleClearApplying} from '../../utils/filter_utils';
 import {vertexShader, fragmentShader} from '../../assets/shaders';
 import {rnLogger} from '../../utils/rnLogger';
 import {trimBase64} from '../../helpers/other_helpers';
+import {setExportVideo} from '../../helpers/exportVideoRegistry';
 import {defaultEditor, type EditorRecord} from '../../store/editorSlice';
 import {defaultAdjustTransform} from '../../store/adjustSlice';
 
@@ -65,6 +66,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   const temperature = currentSelectedEditor.temperature ?? 0.0;
   const blur = currentSelectedEditor.blur ?? 0.0;
   const adjustByIndex = appStore(state => state.adjustByIndex);
+  const isSaveExporting = appStore(state => state.isSaveExporting);
   const adjustTransform =
     adjustByIndex[mediaIndex].id === props.id
       ? adjustByIndex[mediaIndex].value
@@ -300,6 +302,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     videoEl.style.pointerEvents = 'none';
 
     videoElRef.current = videoEl;
+    setExportVideo(props.index, videoEl);
 
     // placeholder 1x1 RGBA texture
     const placeholder = new THREE.DataTexture(
@@ -453,6 +456,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         rnLogger.componentLog('FilteredMedia', 'error', `${e}`);
       }
       videoElRef.current = null;
+      setExportVideo(props.index, null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.uri, props.isVideo, gl]);
@@ -467,12 +471,14 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         | {current: boolean}
         | undefined;
 
-      if (
-        videoElem &&
-        videoReady?.current &&
-        !videoElem.paused &&
-        !videoElem.ended
-      ) {
+      if (!videoElem || !videoReady?.current) {
+        return;
+      }
+
+      const playing = !videoElem.paused && !videoElem.ended;
+      const exportSeek = isSaveExporting && props.isVideo;
+
+      if (playing || exportSeek) {
         mediaTextureState.needsUpdate = true;
       }
     }

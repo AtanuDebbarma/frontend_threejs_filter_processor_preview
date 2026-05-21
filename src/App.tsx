@@ -36,7 +36,7 @@ import {
   postSaveExportData,
   postSaveExportFailed,
 } from './helpers/saveBridge';
-import {TARGET_DIMENSIONS} from './helpers/exportTypes';
+import {EXPORT_DIMENSIONS_FULL} from './helpers/exportTypes';
 
 export type {
   AppColors,
@@ -325,7 +325,7 @@ const App = (): React.JSX.Element => {
           canvasSize.width > 0 &&
           canvasSize.height > 0
         ) {
-          const {width, height} = TARGET_DIMENSIONS.post;
+          const {width, height} = EXPORT_DIMENSIONS_FULL.post;
           window.ReactNativeWebView.postMessage(
             JSON.stringify({
               type: 'CURRENT_ACTIVE_VALUES',

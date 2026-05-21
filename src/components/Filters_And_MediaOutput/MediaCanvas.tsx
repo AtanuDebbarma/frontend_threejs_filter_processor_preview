@@ -2,7 +2,10 @@ import {Canvas} from '@react-three/fiber';
 import React, {useEffect} from 'react';
 import type {MediaItem} from '../../hooks/useVerifiedMediaFiles';
 import {FilteredMedia} from './FilteredMedia';
-import {setExportCanvas} from '../../helpers/exportCanvasRegistry';
+import {
+  setExportCanvas,
+  setExportRenderer,
+} from '../../helpers/exportCanvasRegistry';
 import {appStore} from '../../store/appStore';
 import {defaultAdjustTransform} from '../../store/adjustSlice';
 import {useElementSize} from '../../hooks/useElementSize';
@@ -79,8 +82,9 @@ export const MediaCanvas = ({
         style={{width: '100%', height: '100%', zIndex: 100}}
         camera={{position: [0, 0, 5], fov: 50}}
         gl={{antialias: true, alpha: true, preserveDrawingBuffer: true}}
-        onCreated={({gl}) => {
-          setExportCanvas(index, gl.domElement);
+        onCreated={state => {
+          setExportCanvas(index, state.gl.domElement);
+          setExportRenderer(index, {invalidate: state.invalidate});
         }}>
         <FilteredMedia
           id={id}

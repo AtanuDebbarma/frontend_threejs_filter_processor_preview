@@ -121,7 +121,7 @@ Authoritative message list: **`plan_docs/Technical_Requirements.md`** §4 and **
 | **Save** | `EditorMenuMain` — active slide only | Encoded bytes streamed `POST` to RN localhost → device gallery; small `postMessage` metadata |
 | **Post** | `NameAndInputContainer` — all attachments | Web PUT to presigned S3 → RN receives `s3Url` strings → `createPost` GraphQL |
 
-Post MVP output size: **864×1080** (4:5). See Tasks §9–10.
+Post export (images / single video): **1080×1350** (4:5). Reel/story (`!post`): **1080×1920** (9:16). Multi-video Post batch: **864×1080** / **864×1536**. See Tasks §8–9.
 
 ## Tech stack
 
