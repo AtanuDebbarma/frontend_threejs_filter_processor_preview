@@ -4,13 +4,9 @@ import type {
   Insets,
 } from '../types/webBridgeTypes';
 import type {MediaFile} from '../types/filterTypes';
-import {applyHydrationData, trimUriForLog} from './other_helpers';
+import {applyHydrationData, trimBase64} from './other_helpers';
 import {configureEditorLogging, rnLogger} from '../utils/rnLogger';
 import type {Dispatch, SetStateAction} from 'react';
-
-/** RN static-server URLs served from loopback (Phase 4). */
-export const isLocalhostMediaUrl = (url: string): boolean =>
-  /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(url);
 
 export const postMessageToRN = (type: string, payload: unknown = {}): void => {
   if (!window.ReactNativeWebView) {
@@ -41,12 +37,8 @@ export const applyHydrationFromPayload = async (
     configureEditorLogging({production: data.production});
   }
 
-  const hasLocalhost = data.file.some(f => isLocalhostMediaUrl(f.uri));
-  const logPayload = trimUriForLog({files: data.file});
-  rnLogger.log(
-    `📥 ${source} (${data.file.length} file(s)${hasLocalhost ? ', localhost static server' : ''}):`,
-    logPayload,
-  );
+  const logPayload = trimBase64({files: data.file});
+  rnLogger.log(`📥 ${source} (${data.file.length} file(s)):`, logPayload);
 
   await applyHydrationData(
     data,
