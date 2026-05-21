@@ -15,7 +15,7 @@ import {
   useVerifiedMediaFiles,
   type MediaItem,
 } from '../../hooks/useVerifiedMediaFiles';
-import {trimUriForLog} from '../../helpers/other_helpers';
+import {trimBase64} from '../../helpers/other_helpers';
 import {MediaCanvas} from './MediaCanvas';
 
 export const MediaCanvasContainer = ({
@@ -50,13 +50,11 @@ export const MediaCanvasContainer = ({
   //   allConditionsMet: post && mediaList && mediaList.length,
   // });
 
-  const filesLoadedKeyRef = useRef('');
-
   useEffect(() => {
     if (mediaList.length > 0) {
       setAspectType(mediaList[0].aspectType);
       setInitialized(true);
-      const trimmed = trimUriForLog({mediItems: mediaList});
+      const trimmed = trimBase64({files: mediaList});
       rnLogger.componentLog(
         'MediaCanvas',
         'log',
@@ -64,30 +62,6 @@ export const MediaCanvasContainer = ({
       );
     }
   }, [mediaList]);
-
-  // Phase 4: RN may stop the read-only static server after all media is in memory.
-  useEffect(() => {
-    if (!window.ReactNativeWebView) {
-      return;
-    }
-    if (mediaFiles.length === 0 || mediaList.length !== mediaFiles.length) {
-      return;
-    }
-
-    const key = mediaFiles.map(f => `${f.id}|${f.uri}`).join(',');
-    if (filesLoadedKeyRef.current === key) {
-      return;
-    }
-    filesLoadedKeyRef.current = key;
-
-    window.ReactNativeWebView.postMessage(
-      JSON.stringify({
-        type: 'FILES_LOADED',
-        payload: {count: mediaList.length},
-      }),
-    );
-    rnLogger.log(`📤 FILES_LOADED (${mediaList.length} item(s))`);
-  }, [mediaFiles, mediaList]);
 
   // per-media state and refs
   const videoRefs = useRef<
