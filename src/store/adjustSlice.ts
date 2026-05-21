@@ -10,7 +10,6 @@ export type AdjustTransform = {
   scale: number;
   rotation: number;
   bgColor: string;
-  mvp: number[] | null;
 };
 
 export const defaultAdjustTransform: AdjustTransform = {
@@ -19,7 +18,6 @@ export const defaultAdjustTransform: AdjustTransform = {
   scale: 1,
   rotation: 0,
   bgColor: '#000000',
-  mvp: null,
 };
 
 export type TagPoint = {

@@ -350,8 +350,21 @@ export const MediaCanvasContainer = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, mediaList, storeActiveIndex]);
 
-  const RenderTagIcon = () => {
+  // Video slides cannot use position tags — exit tag mode when carousel lands on video.
+  useEffect(() => {
     if (activeIndex === null) return;
+    const media = mediaList[activeIndex];
+    if (media?.mediaType === 'video') {
+      setTagMode(false);
+    }
+  }, [activeIndex, mediaList, setTagMode]);
+
+  const RenderTagIcon = ({mediaIndex}: {mediaIndex: number}) => {
+    const media = mediaList[mediaIndex];
+    if (!media || media.mediaType === 'video') {
+      return null;
+    }
+
     const handleIconPress = () => {
       setTimeout(() => {
         setTagMode(true);
@@ -400,7 +413,7 @@ export const MediaCanvasContainer = ({
                 index={0}
               />
             )}
-            <RenderTagIcon />
+            <RenderTagIcon mediaIndex={0} />
             {/* UPDATED: Show button logic (like RN code) */}
             {(playerIconTappedMap[0] || !playingMap[0] || showButtonMap[0]) && (
               <div className="pointer-events-none absolute top-1/2 left-1/2 z-500 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/50 p-4 text-white hover:bg-black/80">
@@ -453,7 +466,7 @@ export const MediaCanvasContainer = ({
                 index={0}
               />
             )}
-            <RenderTagIcon />
+            <RenderTagIcon mediaIndex={0} />
 
             {isApplyingFilter && (
               <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
@@ -505,7 +518,7 @@ export const MediaCanvasContainer = ({
                   />
                 )}
 
-                <RenderTagIcon />
+                <RenderTagIcon mediaIndex={index} />
 
                 {/* UPDATED: Show button logic (like RN code) */}
                 {(playerIconTappedMap[index] ||
@@ -564,7 +577,7 @@ export const MediaCanvasContainer = ({
                     index={index}
                   />
                 )}
-                <RenderTagIcon />
+                <RenderTagIcon mediaIndex={index} />
                 {isApplyingFilter && (
                   <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
                     <ClipLoader
