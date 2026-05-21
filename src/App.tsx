@@ -30,6 +30,13 @@ import {AdjustMenu} from './components/Menus/AdjustMenu';
 import type {AdjustRecord} from './store/adjustSlice';
 import type {EditorRecord} from './store/editorSlice';
 import {normalizeForExport} from './helpers/exportHelpers';
+import {exportActiveSlideForGallery} from './helpers/exportMedia';
+import {
+  isStartSaveExportPayload,
+  postSaveExportData,
+  postSaveExportFailed,
+} from './helpers/saveBridge';
+import {TARGET_DIMENSIONS} from './helpers/exportTypes';
 
 export type {
   AppColors,
@@ -49,9 +56,8 @@ const App = (): React.JSX.Element => {
   const mediaFiles = appStore(state => state.mediaFiles);
   const setMediaFiles = appStore(state => state.setMediaFiles);
   const requestedExport = appStore(state => state.requestedExport);
-  const requestedSave = appStore(state => state.requestedSave);
-  const setRequestedSave = appStore(state => state.setRequestedSave);
   const setRequestedExport = appStore(state => state.setRequestedExport);
+  const setIsSaveExporting = appStore(state => state.setIsSaveExporting);
   const setIsModalOpen = appStore(state => state.setIsModalOpen);
   const videoMutedState = appStore.getState().videoMutedState;
   const tagMode = appStore(state => state.tagMode);
@@ -234,9 +240,39 @@ const App = (): React.JSX.Element => {
           }
 
           case 'SAVE_DATA_RECEIVED': {
-            const {id, active} = msg.payload || {};
-            rnLogger.log('✅ Save data received');
-            setRequestedSave(id, active);
+            rnLogger.log('✅ Save data received from RN');
+            setIsSaveExporting(false);
+            break;
+          }
+
+          case 'START_SAVE_EXPORT': {
+            if (!isStartSaveExportPayload(msg.payload)) {
+              rnLogger.warn('⚠️ START_SAVE_EXPORT: invalid payload');
+              break;
+            }
+            const {id, index} = msg.payload;
+            setIsSaveExporting(true);
+            void (async () => {
+              try {
+                const result = await exportActiveSlideForGallery(
+                  id,
+                  index,
+                  'post',
+                );
+                postSaveExportData(result);
+              } catch (err) {
+                const message =
+                  err instanceof Error ? err.message : 'Export failed';
+                rnLogger.error('❌ Save export failed:', message);
+                postSaveExportFailed({id, error: message});
+                setIsSaveExporting(false);
+              }
+            })();
+            break;
+          }
+
+          case 'SAVE_EXPORT_FAILED': {
+            setIsSaveExporting(false);
             break;
           }
 
@@ -261,7 +297,7 @@ const App = (): React.JSX.Element => {
     applyLogConfigFromHydration,
     setIsModalOpen,
     setRequestedExport,
-    setRequestedSave,
+    setIsSaveExporting,
   ]);
 
   useEffect(() => {
@@ -270,7 +306,7 @@ const App = (): React.JSX.Element => {
 
   useEffect(() => {
     try {
-      if (requestedSave.active || requestedExport) {
+      if (requestedExport) {
         const payload = normalizeForExport({
           activeFilter,
           currentEditorValues,
@@ -279,19 +315,9 @@ const App = (): React.JSX.Element => {
           mediaFiles,
         });
 
-        let filteredPayload = payload;
-
-        // 🎯 Save only one file
-        if (requestedSave.active && requestedSave.id) {
-          filteredPayload = {
-            filter: payload.filter,
-            files: payload.files.filter(f => f?.id === requestedSave.id),
-          };
-        }
-
         rnLogger.log(
-          '🎨 Sending current active values to RN:',
-          JSON.stringify(filteredPayload, null, 2),
+          '🎨 Sending current active values to RN (export):',
+          JSON.stringify(payload, null, 2),
         );
 
         if (
@@ -299,20 +325,16 @@ const App = (): React.JSX.Element => {
           canvasSize.width > 0 &&
           canvasSize.height > 0
         ) {
+          const {width, height} = TARGET_DIMENSIONS.post;
           window.ReactNativeWebView.postMessage(
             JSON.stringify({
               type: 'CURRENT_ACTIVE_VALUES',
               payload: {
                 post: post,
-                save: requestedSave.active
-                  ? {
-                      active: requestedSave.active || false,
-                      id: requestedSave.id || null,
-                    }
-                  : null,
-                canvasWidth: canvasSize.width,
-                canvasHeight: canvasSize.height,
-                ...filteredPayload,
+                save: null,
+                canvasWidth: width,
+                canvasHeight: height,
+                ...payload,
               },
             }),
           );
@@ -322,7 +344,7 @@ const App = (): React.JSX.Element => {
       rnLogger.error('Failed to send current active values to RN:', error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestedSave, requestedExport, canvasSize]);
+  }, [requestedExport, canvasSize]);
 
   useEffect(() => {
     try {
