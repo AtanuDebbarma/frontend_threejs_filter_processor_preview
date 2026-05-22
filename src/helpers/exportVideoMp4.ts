@@ -1,26 +1,24 @@
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import {
   ALL_FORMATS,
   BlobSource,
   BufferTarget,
-  Conversion,
+  CanvasSource,
+  EncodedAudioPacketSource,
+  EncodedPacket,
+  EncodedPacketSink,
   Input,
   Mp4OutputFormat,
   Output,
+  type AudioCodec,
   getFirstEncodableVideoCodec,
 } from 'mediabunny';
 import {rnLogger} from '../utils/rnLogger';
 import {getExportCanvas, getExportRenderer} from './exportCanvasRegistry';
 import {VIDEO_EXPORT_FPS} from './exportTypes';
 import {blitCanvasToExportSize} from './exportBlit';
+import {mediaUriToBlob} from './mediaUriToBlob';
 import {getExportVideo} from './exportVideoRegistry';
-
-const uriToBlob = async (uri: string): Promise<Blob> => {
-  const res = await fetch(uri);
-  if (!res.ok) {
-    throw new Error(`Failed to read video (${res.status})`);
-  }
-  return res.blob();
-};
 
 const waitAnimationFrames = (count = 2): Promise<void> =>
   new Promise(resolve => {
@@ -62,9 +60,38 @@ export type ExportVideoMp4Params = {
   muted: boolean;
 };
 
+const loadAudioPackets = async (
+  uri: string,
+): Promise<{codec: AudioCodec; packets: EncodedPacket[]} | null> => {
+  try {
+    const blob = await mediaUriToBlob(uri);
+    const input = new Input({
+      source: new BlobSource(blob),
+      formats: ALL_FORMATS,
+    });
+    const audioTrack = await input.getPrimaryAudioTrack();
+    if (!audioTrack) {
+      return null;
+    }
+    const codec = await audioTrack.getCodec();
+    if (!codec) {
+      return null;
+    }
+    const packets: EncodedPacket[] = [];
+    const sink = new EncodedPacketSink(audioTrack);
+    for await (const packet of sink.packets()) {
+      packets.push(packet);
+    }
+    return {codec: codec as AudioCodec, packets};
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    rnLogger.warn(`📤 Audio mux skipped: ${msg}`);
+    return null;
+  }
+};
+
 /**
- * Encodes filtered WebGL preview frames to MP4 (H.264 + source audio when not muted).
- * Uses Mediabunny Conversion with a per-frame process hook; output is buffered for RN base64 handoff.
+ * Encodes filtered WebGL preview frames to MP4 (H.264 + source audio when readable).
  */
 export const exportVideoMp4 = async ({
   index,
@@ -100,9 +127,7 @@ export const exportVideoMp4 = async ({
   frameCanvas.width = width;
   frameCanvas.height = height;
 
-  const renderFilteredFrameAt = async (
-    timeSec: number,
-  ): Promise<HTMLCanvasElement> => {
+  const renderFilteredFrameAt = async (timeSec: number): Promise<void> => {
     const clamped = Math.min(
       Math.max(0, timeSec),
       Math.max(0, video.duration - 0.001),
@@ -112,7 +137,7 @@ export const exportVideoMp4 = async ({
     await waitForVideoSeek(video);
     renderer?.invalidate();
     await waitAnimationFrames(2);
-    return blitCanvasToExportSize(
+    blitCanvasToExportSize(
       sourceCanvas,
       width,
       height,
@@ -121,51 +146,60 @@ export const exportVideoMp4 = async ({
     );
   };
 
-  const inputBlob = await uriToBlob(uri);
-  const input = new Input({
-    source: new BlobSource(inputBlob),
-    formats: ALL_FORMATS,
-  });
+  const audioData = muted ? null : await loadAudioPackets(uri);
+
   const target = new BufferTarget();
   const output = new Output({
     format: new Mp4OutputFormat({fastStart: false}),
     target,
   });
 
+  const videoSource = new CanvasSource(frameCanvas, {
+    codec: videoCodec,
+    bitrate: 4_000_000,
+    keyFrameInterval: 2,
+  });
+  output.addVideoTrack(videoSource, {frameRate: VIDEO_EXPORT_FPS});
+
+  let audioSource: EncodedAudioPacketSource | null = null;
+  if (audioData) {
+    audioSource = new EncodedAudioPacketSource(audioData.codec);
+    output.addAudioTrack(audioSource);
+  }
+
   const wasPlaying = !video.paused;
   video.pause();
 
-  try {
-    const conversion = await Conversion.init({
-      input,
-      output,
-      video: {
-        width,
-        height,
-        codec: videoCodec,
-        bitrate: 4_000_000,
-        frameRate: VIDEO_EXPORT_FPS,
-        forceTranscode: true,
-        allowRotationMetadata: false,
-        processedWidth: width,
-        processedHeight: height,
-        process: sample => renderFilteredFrameAt(sample.timestamp),
-      },
-      audio: muted ? {discard: true} : undefined,
-    });
+  const frameDuration = 1 / VIDEO_EXPORT_FPS;
+  const totalFrames = Math.max(1, Math.ceil(video.duration * VIDEO_EXPORT_FPS));
 
-    if (!conversion.isValid) {
-      const reason = conversion.discardedTracks[0]?.reason ?? 'unknown';
-      throw new Error(`Video export configuration invalid: ${reason}`);
+  try {
+    await output.start();
+
+    for (let i = 0; i < totalFrames; i++) {
+      const t = i * frameDuration;
+      if (t >= video.duration) {
+        break;
+      }
+      await renderFilteredFrameAt(t);
+      await videoSource.add(t, frameDuration);
+      if (i % 15 === 0 || i === totalFrames - 1) {
+        rnLogger.log(
+          `📤 Video encode ${Math.round(((i + 1) / totalFrames) * 100)}% frame ${i + 1}/${totalFrames}`,
+        );
+      }
     }
 
-    conversion.onProgress = (progress, processedTime) => {
-      rnLogger.log(
-        `📤 Video encode ${Math.round(progress * 100)}% @ ${processedTime.toFixed(1)}s`,
-      );
-    };
+    videoSource.close();
 
-    await conversion.execute();
+    if (audioSource && audioData) {
+      for (const packet of audioData.packets) {
+        await audioSource.add(packet);
+      }
+      audioSource.close();
+    }
+
+    await output.finalize();
   } finally {
     if (wasPlaying) {
       void video.play().catch(() => undefined);
