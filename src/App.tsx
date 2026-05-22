@@ -31,6 +31,7 @@ import type {AdjustRecord} from './store/adjustSlice';
 import type {EditorRecord} from './store/editorSlice';
 import {normalizeForExport} from './helpers/exportHelpers';
 import {exportActiveSlideForGallery} from './helpers/exportMedia';
+import {SaveExportStage} from './helpers/saveExportDiagnostics';
 import {
   isStartSaveExportPayload,
   postSaveExportData,
@@ -247,7 +248,16 @@ const App = (): React.JSX.Element => {
 
           case 'START_SAVE_EXPORT': {
             if (!isStartSaveExportPayload(msg.payload)) {
-              rnLogger.warn('⚠️ START_SAVE_EXPORT: invalid payload');
+              const fallbackId =
+                typeof (msg.payload as {id?: string})?.id === 'string'
+                  ? (msg.payload as {id: string}).id
+                  : 'unknown';
+              postSaveExportFailed({
+                id: fallbackId,
+                error: 'START_SAVE_EXPORT: invalid payload',
+                stage: SaveExportStage.INVALID_START_PAYLOAD,
+              });
+              setIsSaveExporting(false);
               break;
             }
             const {id, index} = msg.payload;
@@ -259,12 +269,32 @@ const App = (): React.JSX.Element => {
                   index,
                   'post',
                 );
-                postSaveExportData(result);
+                try {
+                  postSaveExportData(result);
+                } catch (postErr) {
+                  postSaveExportFailed({
+                    id,
+                    error:
+                      postErr instanceof Error
+                        ? postErr.message
+                        : 'SAVE_EXPORT_DATA post failed',
+                    mediaType: result.mediaType,
+                    stage: SaveExportStage.BRIDGE_POST_DATA,
+                  });
+                  setIsSaveExporting(false);
+                }
               } catch (err) {
-                const message =
-                  err instanceof Error ? err.message : 'Export failed';
-                rnLogger.error('❌ Save export failed:', message);
-                postSaveExportFailed({id, error: message});
+                const mediaType =
+                  appStore.getState().mediaFiles[index]?.mediaType;
+                postSaveExportFailed({
+                  id,
+                  error: err instanceof Error ? err.message : 'Export failed',
+                  mediaType:
+                    mediaType === 'photo' || mediaType === 'video'
+                      ? mediaType
+                      : undefined,
+                  stage: SaveExportStage.EXPORT_ORCHESTRATOR,
+                });
                 setIsSaveExporting(false);
               }
             })();
@@ -281,7 +311,13 @@ const App = (): React.JSX.Element => {
             break;
         }
       } catch (err) {
-        rnLogger.error('❌ Bad message from RN via document:', event.data, err);
+        rnLogger.componentLog(
+          'App',
+          'error',
+          `[Save:${SaveExportStage.MESSAGE_HANDLER}] Bad message from RN: ${err}`,
+          event.data,
+          err,
+        );
       }
     };
 
@@ -341,7 +377,12 @@ const App = (): React.JSX.Element => {
         }
       }
     } catch (error) {
-      rnLogger.error('Failed to send current active values to RN:', error);
+      rnLogger.componentLog(
+        'App',
+        'error',
+        `Failed to send current active values to RN: ${error}`,
+        error,
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedExport, canvasSize]);
@@ -368,7 +409,12 @@ const App = (): React.JSX.Element => {
         }
       }
     } catch (error) {
-      rnLogger.error('Failed to open adjust menus:', error);
+      rnLogger.componentLog(
+        'App',
+        'error',
+        `Failed to open adjust menus: ${error}`,
+        error,
+      );
     }
   }, [activeButton, tagMode]);
 

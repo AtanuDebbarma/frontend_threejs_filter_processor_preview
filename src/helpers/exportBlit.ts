@@ -1,3 +1,5 @@
+import {assertSaveExport, SaveExportStage} from './saveExportDiagnostics';
+
 /** Cover-fit WebGL canvas into fixed export framebuffer (preview parity). */
 export const blitCanvasToExportSize = (
   source: HTMLCanvasElement,
@@ -10,9 +12,11 @@ export const blitCanvasToExportSize = (
   out.width = targetWidth;
   out.height = targetHeight;
   const ctx = out.getContext('2d');
-  if (!ctx) {
-    throw new Error('2D canvas unavailable for export');
-  }
+  assertSaveExport(
+    ctx,
+    SaveExportStage.VALIDATE_CANVAS,
+    '2D canvas unavailable for export',
+  );
 
   ctx.fillStyle = backgroundColor;
   ctx.fillRect(0, 0, targetWidth, targetHeight);

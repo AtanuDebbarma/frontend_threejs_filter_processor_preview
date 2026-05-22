@@ -7,6 +7,7 @@ import type {FilterItem} from '../../types/filterTypes';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {faArrowLeft} from '@fortawesome/free-solid-svg-icons';
 import type {AppColors, Insets} from '../../App';
+import {rnLogger} from '../../utils/rnLogger';
 
 type Props = {
   appColors: AppColors;
@@ -72,7 +73,11 @@ export const FilterMenu = ({
         );
         setVideoThumbnail(thumbnail);
       } catch (err) {
-        console.error('Thumbnail generation failed:', err);
+        rnLogger.componentLog(
+          'FilterMenu',
+          'error',
+          `Thumbnail generation failed: ${err}`,
+        );
       } finally {
         setIsLoadingThumbnail(false);
       }
@@ -105,7 +110,11 @@ export const FilterMenu = ({
         });
       });
     } catch (err) {
-      console.error('Failed to apply LUT:', err);
+      rnLogger.componentLog(
+        'FilterMenu',
+        'error',
+        `Failed to apply LUT: ${err}`,
+      );
     } finally {
       setApplying(false);
     }

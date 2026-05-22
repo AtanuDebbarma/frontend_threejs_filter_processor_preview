@@ -14,6 +14,13 @@ import {
   getFirstEncodableVideoCodec,
 } from 'mediabunny';
 import {rnLogger} from '../utils/rnLogger';
+import {
+  assertSaveExport,
+  assertSaveExportCondition,
+  logSaveTechnical,
+  logSaveWarn,
+  SaveExportStage,
+} from './saveExportDiagnostics';
 import {getExportCanvas, getExportRenderer} from './exportCanvasRegistry';
 import {VIDEO_EXPORT_FPS} from './exportTypes';
 import {blitCanvasToExportSize} from './exportBlit';
@@ -84,8 +91,7 @@ const loadAudioPackets = async (
     }
     return {codec: codec as AudioCodec, packets};
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    rnLogger.warn(`📤 Audio mux skipped: ${msg}`);
+    logSaveWarn(SaveExportStage.VIDEO_AUDIO_READ, err, {uri: uri.slice(0, 80)});
     return null;
   }
 };
@@ -105,23 +111,37 @@ export const exportVideoMp4 = async ({
   const video = getExportVideo(index);
   const renderer = getExportRenderer(index);
 
-  if (!sourceCanvas || sourceCanvas.width < 2 || sourceCanvas.height < 2) {
-    throw new Error(
-      'Preview canvas not ready — wait for the editor to finish loading',
-    );
-  }
-  if (!video || !Number.isFinite(video.duration) || video.duration <= 0) {
-    throw new Error('Video element not ready for export');
-  }
+  assertSaveExport(
+    sourceCanvas,
+    SaveExportStage.VALIDATE_CANVAS,
+    'Preview canvas not ready — wait for the editor to finish loading',
+  );
+  assertSaveExportCondition(
+    sourceCanvas.width >= 2 && sourceCanvas.height >= 2,
+    SaveExportStage.VALIDATE_CANVAS,
+    'Preview canvas not ready — wait for the editor to finish loading',
+  );
+  assertSaveExport(
+    video,
+    SaveExportStage.VIDEO_VALIDATE,
+    'Video element not ready for export',
+  );
+  assertSaveExportCondition(
+    Number.isFinite(video.duration) && video.duration > 0,
+    SaveExportStage.VIDEO_VALIDATE,
+    'Video element not ready for export',
+  );
 
   const videoCodec = await getFirstEncodableVideoCodec(['avc'], {
     width,
     height,
     bitrate: 4_000_000,
   });
-  if (!videoCodec) {
-    throw new Error('H.264 video encoding is not supported on this device');
-  }
+  assertSaveExport(
+    videoCodec,
+    SaveExportStage.VIDEO_CODEC,
+    'H.264 video encoding is not supported on this device',
+  );
 
   const frameCanvas = document.createElement('canvas');
   frameCanvas.width = width;
@@ -174,32 +194,50 @@ export const exportVideoMp4 = async ({
   const totalFrames = Math.max(1, Math.ceil(video.duration * VIDEO_EXPORT_FPS));
 
   try {
-    await output.start();
+    try {
+      await output.start();
 
-    for (let i = 0; i < totalFrames; i++) {
-      const t = i * frameDuration;
-      if (t >= video.duration) {
-        break;
+      for (let i = 0; i < totalFrames; i++) {
+        const t = i * frameDuration;
+        if (t >= video.duration) {
+          break;
+        }
+        try {
+          await renderFilteredFrameAt(t);
+          await videoSource.add(t, frameDuration);
+        } catch (frameErr) {
+          logSaveTechnical(SaveExportStage.VIDEO_ENCODE_LOOP, frameErr, {
+            index,
+            frame: i + 1,
+            totalFrames,
+            t,
+          });
+          throw frameErr;
+        }
+        if (i % 15 === 0 || i === totalFrames - 1) {
+          rnLogger.log(
+            `📤 Video encode ${Math.round(((i + 1) / totalFrames) * 100)}% frame ${i + 1}/${totalFrames}`,
+          );
+        }
       }
-      await renderFilteredFrameAt(t);
-      await videoSource.add(t, frameDuration);
-      if (i % 15 === 0 || i === totalFrames - 1) {
-        rnLogger.log(
-          `📤 Video encode ${Math.round(((i + 1) / totalFrames) * 100)}% frame ${i + 1}/${totalFrames}`,
-        );
+
+      videoSource.close();
+
+      if (audioSource && audioData) {
+        for (const packet of audioData.packets) {
+          await audioSource.add(packet);
+        }
+        audioSource.close();
       }
+
+      await output.finalize();
+    } catch (encodeErr) {
+      logSaveTechnical(SaveExportStage.VIDEO_MUX_FINALIZE, encodeErr, {
+        index,
+        totalFrames,
+      });
+      throw encodeErr;
     }
-
-    videoSource.close();
-
-    if (audioSource && audioData) {
-      for (const packet of audioData.packets) {
-        await audioSource.add(packet);
-      }
-      audioSource.close();
-    }
-
-    await output.finalize();
   } finally {
     if (wasPlaying) {
       void video.play().catch(() => undefined);
@@ -207,9 +245,16 @@ export const exportVideoMp4 = async ({
   }
 
   const buffer = target.buffer;
-  if (!buffer || buffer.byteLength === 0) {
-    throw new Error('Video export produced an empty file');
-  }
+  assertSaveExport(
+    buffer,
+    SaveExportStage.VIDEO_EMPTY_OUTPUT,
+    'Video export produced an empty file',
+  );
+  assertSaveExportCondition(
+    buffer.byteLength > 0,
+    SaveExportStage.VIDEO_EMPTY_OUTPUT,
+    'Video export produced an empty file',
+  );
 
   return new Blob([buffer], {type: 'video/mp4'});
 };

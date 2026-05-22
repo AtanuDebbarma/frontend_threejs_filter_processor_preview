@@ -64,5 +64,17 @@ export type SaveExportDataPayload = {
 
 export type SaveExportFailedPayload = {
   id: string;
+  /** Technical message (mapped to user copy in saveBridge). */
   error: string;
+  mediaType?: 'photo' | 'video';
+  /** RN devtools filter: `[Save:STAGE]` in rnLogger. */
+  stage?: string;
+};
+
+/** RN snackbar + optional native log — `error` is user-facing. */
+export type SaveExportFailedMessage = {
+  id: string;
+  error: string;
+  technicalError?: string;
+  mediaType?: 'photo' | 'video';
 };

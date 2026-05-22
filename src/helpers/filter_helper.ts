@@ -1,5 +1,5 @@
 // src/helpers/filter_helper.ts
-import {rnLogger} from '../utils/rnLogger';
+import {fnLog} from '../utils/rnLogger';
 
 /** URIs the <video> element can load without fetch (RN hydration uses file:// for videos). */
 const isDirectVideoSrc = (uri: string): boolean =>
@@ -93,7 +93,7 @@ export const getVideoThumbnail = async (
 
     return thumbnail;
   } catch (err) {
-    rnLogger.error?.('getVideoThumbnail', err);
+    fnLog('getVideoThumbnail', 'error', `Failed: ${err}`, err);
     throw err;
   } finally {
     if (createdObjectUrl) URL.revokeObjectURL(createdObjectUrl);

@@ -30,15 +30,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Log to RN
-    if (errorInfo.componentStack !== null) {
-      captureError(error, errorInfo.componentStack, 'ErrorBoundary');
-    }
-
-    rnLogger.error('React Error Boundary caught an error:', {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-    });
+    captureError(error, errorInfo.componentStack ?? undefined, 'ErrorBoundary');
+    rnLogger.componentLog(
+      'ErrorBoundary',
+      'error',
+      `Caught: ${error.message}`,
+      {stack: error.stack, componentStack: errorInfo.componentStack},
+    );
 
     // Call custom error handler if provided
     if (this.props.onError) {

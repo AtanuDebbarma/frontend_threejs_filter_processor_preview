@@ -1,4 +1,5 @@
 import type {StateCreator} from 'zustand';
+import {fnLog} from '../utils/rnLogger';
 import type {AppState} from './appStore';
 import {defaultFilter, type FilterItem} from '../types/filterTypes';
 
@@ -59,7 +60,12 @@ export const createFilterSlice: StateCreator<
       set(state => {
         state.isApplyingFilter = false;
       });
-      console.error('Failed to Apply Filter', error);
+      fnLog(
+        'filterSlice.clearActiveFilter',
+        'error',
+        `Failed: ${error}`,
+        error,
+      );
       alert(`Failed to Apply Filter ${error}`);
     }
   },
@@ -75,7 +81,12 @@ export const createFilterSlice: StateCreator<
         state.isApplyingFilter = loading;
       });
     } catch (error) {
-      console.error('Failed to Apply Filter, during loading', error);
+      fnLog(
+        'filterSlice.setIsApplyingFilter',
+        'error',
+        `Failed during loading: ${error}`,
+        error,
+      );
       alert('Failed to Apply Filter during loading');
     }
   },
@@ -89,7 +100,7 @@ export const createFilterSlice: StateCreator<
         state.activeFilter = filter;
       });
     } catch (error) {
-      console.error('Failed to Apply Filter', error);
+      fnLog('filterSlice.setActiveFilter', 'error', `Failed: ${error}`, error);
       alert(`Failed to Apply Filter ${error}`);
     }
   },
