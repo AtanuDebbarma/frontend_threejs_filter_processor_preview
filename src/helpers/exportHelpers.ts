@@ -1,6 +1,7 @@
 import type {AdjustRecord} from '../store/adjustSlice';
 import type {EditorRecord} from '../store/editorSlice';
 import type {FilterItem, FilterParams, MediaFile} from '../types/filterTypes';
+import {fnLog} from '../utils/rnLogger';
 
 /**
  * Normalize the active filter, current editor values, and current store adjust
@@ -33,7 +34,11 @@ export function normalizeForExport({
       const media = mediaFiles[Number(index)];
 
       if (!media) {
-        console.warn(`⚠️ No matching media file for editor index ${index}`);
+        fnLog(
+          'normalizeForExport',
+          'warn',
+          `No matching media file for editor index ${index}`,
+        );
         return null;
       }
       const merged: FilterParams = {

@@ -5,6 +5,13 @@ import {rnLogger} from '../utils/rnLogger';
 import {blitCanvasToExportSize} from './exportBlit';
 import {exportVideoMp4} from './exportVideoMp4';
 import {
+  assertSaveExport,
+  assertSaveExportCondition,
+  logSaveTechnical,
+  SaveExportStage,
+  throwSaveExportError,
+} from './saveExportDiagnostics';
+import {
   resolveExportDimensions,
   type ExportMode,
   type SaveExportDataPayload,
@@ -64,7 +71,10 @@ export const captureExportBlob = async (
   const muted = state.videoMutedState[index]?.muted ?? false;
   const media = state.mediaFiles[index];
   if (!media?.uri) {
-    throw new Error('Video URI missing for export');
+    throwSaveExportError(
+      SaveExportStage.VIDEO_URI,
+      'Video URI missing for export',
+    );
   }
 
   return exportVideoMp4({
@@ -90,16 +100,28 @@ export const exportActiveSlideForGallery = async (
 ): Promise<ExportActiveSlideResult> => {
   const state = appStore.getState();
   const media = state.mediaFiles[index];
-  if (!media || media.id !== fileId) {
-    throw new Error(`No media at index ${index} for id ${fileId}`);
-  }
+  assertSaveExport(
+    media,
+    SaveExportStage.VALIDATE_MEDIA,
+    `No media at index ${index} for id ${fileId}`,
+  );
+  assertSaveExportCondition(
+    media.id === fileId,
+    SaveExportStage.VALIDATE_MEDIA,
+    `No media at index ${index} for id ${fileId}`,
+  );
 
   const sourceCanvas = getExportCanvas(index);
-  if (!sourceCanvas || sourceCanvas.width < 2 || sourceCanvas.height < 2) {
-    throw new Error(
-      'Preview canvas not ready — wait for the editor to finish loading',
-    );
-  }
+  assertSaveExport(
+    sourceCanvas,
+    SaveExportStage.VALIDATE_CANVAS,
+    'Preview canvas not ready — wait for the editor to finish loading',
+  );
+  assertSaveExportCondition(
+    sourceCanvas.width >= 2 && sourceCanvas.height >= 2,
+    SaveExportStage.VALIDATE_CANVAS,
+    'Preview canvas not ready — wait for the editor to finish loading',
+  );
 
   const videoCount = state.mediaFiles.filter(
     f => f.mediaType === 'video',
@@ -116,16 +138,36 @@ export const exportActiveSlideForGallery = async (
     `📤 Export start id=${fileId} index=${index} ${width}x${height} type=${media.mediaType}`,
   );
 
-  const blob = await captureExportBlob(
-    sourceCanvas,
-    width,
-    height,
-    bgColor,
-    media.mediaType,
-    index,
-  );
+  let blob: Blob;
+  try {
+    blob = await captureExportBlob(
+      sourceCanvas,
+      width,
+      height,
+      bgColor,
+      media.mediaType,
+      index,
+    );
+  } catch (err) {
+    const stage =
+      media.mediaType === 'photo'
+        ? SaveExportStage.PHOTO_TO_BLOB
+        : SaveExportStage.VIDEO_ENCODE_LOOP;
+    logSaveTechnical(stage, err, {fileId, index});
+    throw err;
+  }
 
-  const exportBase64 = await blobToBase64(blob);
+  let exportBase64: string;
+  try {
+    exportBase64 = await blobToBase64(blob);
+  } catch (err) {
+    logSaveTechnical(SaveExportStage.BASE64_ENCODE, err, {
+      fileId,
+      bytes: blob.size,
+    });
+    throw err;
+  }
+
   const baseName =
     media.filename?.replace(/\.[^.]+$/, '') || `mobeet_${fileId}`;
   const filename =

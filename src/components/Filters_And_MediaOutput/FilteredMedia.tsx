@@ -165,13 +165,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
           rnLogger.componentLog(
             'FilteredMedia',
             'warn',
-            `Failed to dispose texture, ${e}`,
-          );
-          console.warn('Failed to dispose texture', e);
-          rnLogger.componentLog(
-            'FilteredMedia',
-            'warn',
-            `Failed to dispose texture, ${e}`,
+            `Failed to dispose texture: ${e}`,
           );
         }
         setMediaTextureState(null);
@@ -185,9 +179,8 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
           rnLogger.componentLog(
             'FilteredMedia',
             'warn',
-            `Failed to clean up video element, ${e}`,
+            `Failed to clean up video element: ${e}`,
           );
-          console.warn('Failed to clean up video element', e);
         }
         videoElRef.current = null;
       }
@@ -248,7 +241,6 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         undefined,
         // onError
         err => {
-          console.warn('Texture load error', err);
           rnLogger.componentLog(
             'FilteredMedia',
             'error',
@@ -343,9 +335,17 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       try {
         document.body.appendChild(container);
       } catch (e2) {
-        console.log(e2);
+        rnLogger.componentLog(
+          'FilteredMedia',
+          'warn',
+          `Failed to append video container to body: ${e2}`,
+        );
       }
-      console.log(e);
+      rnLogger.componentLog(
+        'FilteredMedia',
+        'warn',
+        `Failed to append video container to parent: ${e}`,
+      );
     }
     videoContainerRef.current = container;
 
@@ -368,7 +368,11 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
           pendingClearRef.current = null;
         }
       } catch (e) {
-        console.log(e);
+        rnLogger.componentLog(
+          'FilteredMedia',
+          'warn',
+          `Failed to set applying flag on video metadata: ${e}`,
+        );
       }
 
       try {
@@ -390,9 +394,8 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         rnLogger.componentLog(
           'FilteredMedia',
           'error',
-          `video load error: ${e}`,
+          `VideoTexture setup failed: ${e}`,
         );
-        console.error('video load error', e);
       } finally {
         if (didSetApplyingRef.current) {
           scheduleClearApplying(
@@ -406,9 +409,12 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       }
     };
 
-    const onError = (ev: any) => {
-      console.warn('video load error', ev);
-      rnLogger.componentLog('FilteredMedia', 'warn', `video load error, ${ev}`);
+    const onError = (ev: unknown) => {
+      rnLogger.componentLog(
+        'FilteredMedia',
+        'warn',
+        `Video element load error: ${ev}`,
+      );
       scheduleClearApplying(
         true,
         didSetApplyingRef,
@@ -898,9 +904,8 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         rnLogger.componentLog(
           'FilteredMedia',
           'warn',
-          `Failed to dispose previous material uniforms, ${e}`,
+          `Failed to dispose previous material uniforms: ${e}`,
         );
-        console.warn('Failed to dispose previous material uniforms', e);
       }
       prev.dispose && prev.dispose();
     }
@@ -922,9 +927,8 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
           rnLogger.componentLog(
             'FilteredMedia',
             'warn',
-            `Failed to dispose previous material uniforms, ${e}`,
+            `Failed to dispose material uniforms: ${e}`,
           );
-          console.warn('Failed to dispose material uniforms', e);
         }
         material.dispose && material.dispose();
         prevMatRef.current = null;
@@ -977,11 +981,10 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
           );
         }
       } catch (e) {
-        console.warn('Failed to remove video container', e);
         rnLogger.componentLog(
           'FilteredMedia',
           'warn',
-          `Failed to remove video container, ${e}`,
+          `Failed to remove video container: ${e}`,
         );
       }
 

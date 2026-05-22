@@ -45,8 +45,8 @@ export const EditorMenuMain = ({
     setTimeout(() => {
       try {
         requestSaveToDevice(currentID, activeIndex);
-      } catch (err) {
-        console.error('Save request failed:', err);
+      } catch {
+        // postSaveExportFailed already sent from saveBridge
       }
     }, 200);
   };

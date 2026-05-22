@@ -121,6 +121,19 @@ class RNLogger {
 
 export const rnLogger = new RNLogger();
 
+/**
+ * Log from a non-React module (store, helper). Appears as `[WEB:scope]` in WebView
+ * and `WEB_LOG.payload.component` in RN devtools when production=false.
+ */
+export const fnLog = (
+  scope: string,
+  level: LogData['level'],
+  message: string,
+  ...args: unknown[]
+): void => {
+  rnLogger.componentLog(scope, level, message, ...args);
+};
+
 export const setupConsoleInterception = () => {
   const originalConsole = {...console};
 
@@ -153,36 +166,14 @@ export const setupConsoleInterception = () => {
 export const captureError = (
   error: Error,
   componentStack?: string,
-  component?: string,
+  scope = 'GlobalError',
 ) => {
-  const logData: LogData = {
-    level: 'error',
-    message: `Error in ${component || 'Unknown Component'}: ${error.message}`,
-    args: [error],
-    timestamp: Date.now(),
-    component,
-    stack: error.stack || componentStack,
-  };
-
-  console.error(`[WEB:ERROR] ${logData.message}`, error);
-
-  if (shouldForwardToRN()) {
-    try {
-      const bridge = (
-        window as Window & {
-          ReactNativeWebView?: {postMessage: (s: string) => void};
-        }
-      ).ReactNativeWebView;
-      bridge?.postMessage(JSON.stringify({type: 'WEB_LOG', payload: logData}));
-    } catch {
-      /* ignore bridge errors */
-    }
-  }
+  const message = `${error.message}${componentStack ? ` | ${componentStack}` : ''}`;
+  rnLogger.componentLog(scope, 'error', message, error);
 };
 
 export const setupGlobalErrorHandling = () => {
   window.addEventListener('unhandledrejection', event => {
-    rnLogger.error('Unhandled Promise Rejection:', event.reason);
     captureError(
       new Error(String(event.reason)),
       undefined,
@@ -191,7 +182,6 @@ export const setupGlobalErrorHandling = () => {
   });
 
   window.addEventListener('error', event => {
-    rnLogger.error('Uncaught Error:', event.error || event.message);
     captureError(
       event.error || new Error(event.message),
       undefined,

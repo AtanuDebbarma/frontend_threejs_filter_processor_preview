@@ -167,11 +167,10 @@ export const MediaCanvasContainer = ({
           }
         } catch (err) {
           rnLogger.componentLog(
-            'MediaCanvas',
+            'MediaCanvasContainer',
             'error',
-            `togglePlayForIndex failed, ${err}`,
+            `togglePlayForIndex failed: ${err}`,
           );
-          console.error('togglePlayForIndex failed', err);
           setPlayingMap(pm => ({...pm, [index]: false}));
         }
       }, 180);
@@ -244,11 +243,10 @@ export const MediaCanvasContainer = ({
             vid.pause();
           } catch (e) {
             rnLogger.componentLog(
-              'MediaCanvas',
+              'MediaCanvasContainer',
               'error',
-              `❌ Failed to pause video on unmount, ${e}`,
+              `Failed to pause video on unmount: ${e}`,
             );
-            console.error('❌ Failed to pause video on unmount', e);
           }
         }
       });

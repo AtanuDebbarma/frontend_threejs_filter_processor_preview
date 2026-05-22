@@ -85,7 +85,12 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
           createdUrlsRef.current.push(uri);
         } catch (err) {
           const trimmedUri = trimBase64({singleFile: uri});
-          rnLogger.warn(`❌ Failed to fetch media URI: ${trimmedUri}`, err);
+          rnLogger.componentLog(
+            'useVerifiedMediaFiles',
+            'warn',
+            `Failed to fetch media URI: ${trimmedUri}`,
+            err,
+          );
         }
       }
 
@@ -133,7 +138,11 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
             'error',
             () => {
               const trimmedUri = trimBase64({singleFile: uri});
-              rnLogger.warn(`❌ Failed to load video metadata: ${trimmedUri}`);
+              rnLogger.componentLog(
+                'useVerifiedMediaFiles',
+                'warn',
+                `Failed to load video metadata: ${trimmedUri}`,
+              );
               resolve({
                 ...file,
                 uri,
@@ -184,7 +193,11 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
 
         img.onerror = () => {
           const trimmedUri = trimBase64({singleFile: file.uri});
-          rnLogger.warn(`❌ Failed to load image metadata: ${trimmedUri}`);
+          rnLogger.componentLog(
+            'useVerifiedMediaFiles',
+            'warn',
+            `Failed to load image metadata: ${trimmedUri}`,
+          );
           resolve({
             ...file,
             uri,
