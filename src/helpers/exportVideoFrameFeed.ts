@@ -1,18 +1,6 @@
 import type {VideoSample} from 'mediabunny';
-import type {ExportRenderer} from './exportCanvasRegistry';
-
-export type PendingExportFrame = {
-  generation: number;
-  frame: VideoFrame;
-};
-
-type FrameSlot = {
-  generation: number;
-  frame: VideoFrame | null;
-  renderResolve: (() => void) | null;
-};
-
-const slots = new Map<number, FrameSlot>();
+import {getExportFrameDriver} from './exportFrameDriver';
+import {fnLog} from '../utils/rnLogger';
 
 type PipelineReadyState = {
   ready: boolean;
@@ -30,7 +18,7 @@ const getPipelineReady = (index: number): PipelineReadyState => {
   return state;
 };
 
-/** FilteredMedia calls when VideoFrameTexture is mounted for Save export. */
+/** FilteredMedia calls when export VideoFrameTexture + gl.render driver are registered. */
 export const signalExportPipelineReady = (index: number): void => {
   const state = getPipelineReady(index);
   state.ready = true;
@@ -44,7 +32,6 @@ export const resetExportPipelineReady = (index: number): void => {
   pipelineReadyByIndex.delete(index);
 };
 
-/** Wait until R3F export path (VideoFrameTexture + useFrame) is ready before feeding frames. */
 export const waitForExportPipelineReady = (
   index: number,
   timeoutMs = 15_000,
@@ -73,113 +60,23 @@ export const waitForExportPipelineReady = (
   });
 };
 
-const getSlot = (index: number): FrameSlot => {
-  let slot = slots.get(index);
-  if (!slot) {
-    slot = {generation: 0, frame: null, renderResolve: null};
-    slots.set(index, slot);
-  }
-  return slot;
-};
-
-/** FilteredMedia useFrame: take the frame waiting to be painted for this slide. */
-export const takePendingExportFrame = (
-  index: number,
-): PendingExportFrame | null => {
-  const slot = slots.get(index);
-  if (!slot?.frame) {
-    return null;
-  }
-  const pending: PendingExportFrame = {
-    generation: slot.generation,
-    frame: slot.frame,
-  };
-  slot.frame = null;
-  return pending;
-};
-
-export const markExportFrameRendered = (
-  index: number,
-  generation: number,
-): void => {
-  const slot = slots.get(index);
-  if (!slot || slot.generation !== generation) {
-    return;
-  }
-  slot.renderResolve?.();
-  slot.renderResolve = null;
-};
-
 export const clearExportFrameFeed = (index: number): void => {
-  const slot = slots.get(index);
-  if (slot?.frame) {
-    try {
-      slot.frame.close();
-    } catch {
-      /* ignore */
-    }
-  }
-  slots.delete(index);
   resetExportPipelineReady(index);
 };
 
-const waitAnimationFrames = (count = 2): Promise<void> =>
-  new Promise(resolve => {
-    let remaining = count;
-    const tick = () => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        resolve();
-      } else {
-        requestAnimationFrame(tick);
-      }
-    };
-    requestAnimationFrame(tick);
-  });
-
-const waitForExportFrameRendered = (
-  index: number,
-  generation: number,
-  timeoutMs = 8_000,
-): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const slot = getSlot(index);
-    if (slot.generation !== generation) {
-      resolve();
-      return;
-    }
-    const onRendered = () => {
-      window.clearTimeout(timer);
-      resolve();
-    };
-    slot.renderResolve = onRendered;
-    const timer = window.setTimeout(() => {
-      if (slot.renderResolve === onRendered) {
-        slot.renderResolve = null;
-        reject(new Error('Export frame render timed out'));
-      }
-    }, timeoutMs);
-  });
-
 /**
- * Push one decoded frame into the WebGL filter path (VideoFrameTexture), then wait for R3F to render.
+ * Decode one sample, paint through the WebGL filter shader, and render synchronously.
+ * Does not use R3F useFrame / rAF (throttled when RN Save modal covers the WebView).
  */
 export const feedDecodedFrameToFilteredCanvas = async (
   index: number,
   sample: VideoSample,
-  renderer: ExportRenderer | null,
 ): Promise<void> => {
-  const slot = getSlot(index);
-  slot.generation += 1;
-  const generation = slot.generation;
+  await waitForExportPipelineReady(index);
 
-  if (slot.frame) {
-    try {
-      slot.frame.close();
-    } catch {
-      /* ignore */
-    }
-    slot.frame = null;
+  const driver = getExportFrameDriver(index);
+  if (!driver) {
+    throw new Error('Export frame driver missing after pipeline ready');
   }
 
   let videoFrame: VideoFrame;
@@ -189,9 +86,10 @@ export const feedDecodedFrameToFilteredCanvas = async (
     sample.close();
   }
 
-  slot.frame = videoFrame;
-
-  renderer?.invalidate();
-  await waitAnimationFrames(1);
-  await waitForExportFrameRendered(index, generation);
+  try {
+    driver.paintAndRender(videoFrame);
+  } catch (err) {
+    fnLog('feedDecodedFrameToFilteredCanvas', 'error', String(err));
+    throw err;
+  }
 };

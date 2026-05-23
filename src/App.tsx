@@ -214,6 +214,14 @@ const App = (): React.JSX.Element => {
             const {id, index, writePath, chunkSizeBytes} = msg.payload;
             setIsSaveExporting(true);
             pauseAllPreviewVideos();
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(
+                JSON.stringify({
+                  type: 'EXPORT_SAVE_STARTED',
+                  payload: {id},
+                }),
+              );
+            }
             void (async () => {
               try {
                 const result = await exportActiveSlideForGallery(
