@@ -14,6 +14,65 @@ type FrameSlot = {
 
 const slots = new Map<number, FrameSlot>();
 
+type PipelineReadyState = {
+  ready: boolean;
+  waiters: Array<() => void>;
+};
+
+const pipelineReadyByIndex = new Map<number, PipelineReadyState>();
+
+const getPipelineReady = (index: number): PipelineReadyState => {
+  let state = pipelineReadyByIndex.get(index);
+  if (!state) {
+    state = {ready: false, waiters: []};
+    pipelineReadyByIndex.set(index, state);
+  }
+  return state;
+};
+
+/** FilteredMedia calls when VideoFrameTexture is mounted for Save export. */
+export const signalExportPipelineReady = (index: number): void => {
+  const state = getPipelineReady(index);
+  state.ready = true;
+  for (const resolve of state.waiters) {
+    resolve();
+  }
+  state.waiters = [];
+};
+
+export const resetExportPipelineReady = (index: number): void => {
+  pipelineReadyByIndex.delete(index);
+};
+
+/** Wait until R3F export path (VideoFrameTexture + useFrame) is ready before feeding frames. */
+export const waitForExportPipelineReady = (
+  index: number,
+  timeoutMs = 15_000,
+): Promise<void> => {
+  const state = getPipelineReady(index);
+  if (state.ready) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const onReady = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+    state.waiters.push(onReady);
+    const timer = window.setTimeout(() => {
+      const idx = state.waiters.indexOf(onReady);
+      if (idx >= 0) {
+        state.waiters.splice(idx, 1);
+      }
+      reject(
+        new Error(
+          'Export pipeline not ready — VideoFrameTexture did not initialize',
+        ),
+      );
+    }, timeoutMs);
+  });
+};
+
 const getSlot = (index: number): FrameSlot => {
   let slot = slots.get(index);
   if (!slot) {
@@ -61,6 +120,7 @@ export const clearExportFrameFeed = (index: number): void => {
     }
   }
   slots.delete(index);
+  resetExportPipelineReady(index);
 };
 
 const waitAnimationFrames = (count = 2): Promise<void> =>

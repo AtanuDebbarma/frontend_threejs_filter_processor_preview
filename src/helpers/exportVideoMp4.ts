@@ -31,6 +31,7 @@ import {mediaUriToBlob} from './mediaUriToBlob';
 import {
   clearExportFrameFeed,
   feedDecodedFrameToFilteredCanvas,
+  waitForExportPipelineReady,
 } from './exportVideoFrameFeed';
 import {createAppendOnlyMuxTarget} from './exportMuxStreamTarget';
 import {createExportProgressReporter} from './exportProgress';
@@ -235,6 +236,8 @@ export const exportVideoMp4 = async ({
 
   try {
     await output.start();
+
+    await waitForExportPipelineReady(index);
 
     const sink = new VideoSampleSink(videoTrack);
 
