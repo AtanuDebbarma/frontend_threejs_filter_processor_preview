@@ -1,4 +1,4 @@
-/** Hidden <video> elements per slide — for Save export seek/sync. */
+/** Hidden <video> per slide — preview playback only (export uses Mediabunny decode). */
 const exportVideoByIndex = new Map<number, HTMLVideoElement>();
 
 export const setExportVideo = (
@@ -14,6 +14,12 @@ export const setExportVideo = (
 
 export const getExportVideo = (index: number): HTMLVideoElement | null =>
   exportVideoByIndex.get(index) ?? null;
+
+export const forEachExportVideo = (
+  fn: (video: HTMLVideoElement, index: number) => void,
+): void => {
+  exportVideoByIndex.forEach(fn);
+};
 
 export const clearExportVideos = (): void => {
   exportVideoByIndex.clear();

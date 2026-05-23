@@ -29,7 +29,6 @@ export type EditorLogConfigPayload = {
 };
 
 export type PatchPayload = {
-  requestedExport: boolean;
   appColors: AppColors;
   insets: Insets;
 };

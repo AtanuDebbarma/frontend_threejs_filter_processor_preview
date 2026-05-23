@@ -33,6 +33,7 @@ export const MediaCanvasContainer = ({
   const setTagMode = appStore(state => state.setTagMode);
   const globalMutedState = appStore(state => state.videoMutedState);
   const setVideoMutedState = appStore(state => state.setVideoMutedState);
+  const isSaveExporting = appStore(state => state.isSaveExporting);
 
   const [initialized, setInitialized] = useState(false);
   const [aspectType, setAspectType] = useState<
@@ -131,6 +132,7 @@ export const MediaCanvasContainer = ({
   // UPDATED: toggle play/pause with timeout (like RN code)
   const togglePlayForIndex = useCallback(
     async (index: number) => {
+      if (isSaveExporting) return;
       const ref = getVideoRef(index);
       const vid = ref.current;
       if (!vid) return;
@@ -175,7 +177,7 @@ export const MediaCanvasContainer = ({
         }
       }, 180);
     },
-    [getVideoRef],
+    [getVideoRef, isSaveExporting],
   );
 
   // called when canvas/mesh is tapped (from FilteredMedia)

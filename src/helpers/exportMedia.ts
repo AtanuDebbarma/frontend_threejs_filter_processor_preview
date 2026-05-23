@@ -4,6 +4,7 @@ import {defaultAdjustTransform} from '../store/adjustSlice';
 import {rnLogger} from '../utils/rnLogger';
 import {blitCanvasToExportSize} from './exportBlit';
 import {exportVideoMp4} from './exportVideoMp4';
+import {createExportProgressReporter} from './exportProgress';
 import {
   assertSaveExport,
   assertSaveExportCondition,
@@ -11,10 +12,14 @@ import {
   SaveExportStage,
   throwSaveExportError,
 } from './saveExportDiagnostics';
+import {sendSaveChunks} from './saveBridge';
 import {
+  DEFAULT_SAVE_CHUNK_BYTES,
   resolveExportDimensions,
+  SAVE_PHOTO_MAX_BLOB_BYTES,
   type ExportMode,
   type SaveExportDataPayload,
+  type StartSaveExportPayload,
 } from './exportTypes';
 
 export {blitCanvasToExportSize} from './exportBlit';
@@ -43,7 +48,9 @@ export const captureExportBlob = async (
   backgroundColor: string,
   mediaType: 'photo' | 'video',
   index: number,
-): Promise<Blob> => {
+  fileId: string,
+  saveOptions?: Pick<StartSaveExportPayload, 'writePath' | 'chunkSizeBytes'>,
+): Promise<Blob | void> => {
   const framed = blitCanvasToExportSize(
     sourceCanvas,
     targetWidth,
@@ -77,6 +84,23 @@ export const captureExportBlob = async (
     );
   }
 
+  if (saveOptions?.writePath) {
+    return exportVideoMp4({
+      index,
+      uri: media.uri,
+      width: targetWidth,
+      height: targetHeight,
+      backgroundColor,
+      muted,
+      fileId,
+      streamHandoff: {
+        id: fileId,
+        index,
+        chunkSizeBytes: saveOptions.chunkSizeBytes ?? DEFAULT_SAVE_CHUNK_BYTES,
+      },
+    });
+  }
+
   return exportVideoMp4({
     index,
     uri: media.uri,
@@ -84,10 +108,13 @@ export const captureExportBlob = async (
     height: targetHeight,
     backgroundColor,
     muted,
+    fileId,
   });
 };
 
-export type ExportActiveSlideResult = SaveExportDataPayload;
+export type ExportGalleryResult =
+  | {kind: 'base64'; payload: SaveExportDataPayload}
+  | {kind: 'chunked'; id: string; index: number};
 
 /**
  * Encodes the active carousel slide at export dimensions (see resolveExportDimensions).
@@ -97,7 +124,8 @@ export const exportActiveSlideForGallery = async (
   fileId: string,
   index: number,
   mode: ExportMode = 'post',
-): Promise<ExportActiveSlideResult> => {
+  saveOptions?: Pick<StartSaveExportPayload, 'writePath' | 'chunkSizeBytes'>,
+): Promise<ExportGalleryResult> => {
   const state = appStore.getState();
   const media = state.mediaFiles[index];
   assertSaveExport(
@@ -138,16 +166,82 @@ export const exportActiveSlideForGallery = async (
     `📤 Export start id=${fileId} index=${index} ${width}x${height} type=${media.mediaType}`,
   );
 
-  let blob: Blob;
+  const progress = createExportProgressReporter(fileId);
+
   try {
-    blob = await captureExportBlob(
+    const blobOrVoid = await captureExportBlob(
       sourceCanvas,
       width,
       height,
       bgColor,
       media.mediaType,
       index,
+      fileId,
+      saveOptions,
     );
+
+    if (media.mediaType === 'video' && saveOptions?.writePath) {
+      progress(100, 'encoding', true);
+      return {kind: 'chunked', id: fileId, index};
+    }
+
+    const blob = blobOrVoid as Blob;
+    if (media.mediaType === 'photo' && blob.size > SAVE_PHOTO_MAX_BLOB_BYTES) {
+      throwSaveExportError(
+        SaveExportStage.BASE64_ENCODE,
+        'Photo export is too large for bridge handoff',
+      );
+    }
+
+    if (media.mediaType === 'video' && !saveOptions?.writePath) {
+      const writeProgress = createExportProgressReporter(fileId);
+      writeProgress(0, 'writing', true);
+      await sendSaveChunks(blob, {
+        id: fileId,
+        index,
+        chunkSizeBytes: saveOptions?.chunkSizeBytes,
+        onProgress: pct => writeProgress(pct, 'writing'),
+      });
+      writeProgress(100, 'writing', true);
+      return {kind: 'chunked', id: fileId, index};
+    }
+
+    let exportBase64: string;
+    try {
+      exportBase64 = await blobToBase64(blob);
+    } catch (err) {
+      logSaveTechnical(SaveExportStage.BASE64_ENCODE, err, {
+        fileId,
+        bytes: blob.size,
+      });
+      throw err;
+    }
+
+    const baseName =
+      media.filename?.replace(/\.[^.]+$/, '') || `mobeet_${fileId}`;
+    const filename =
+      media.mediaType === 'photo'
+        ? `${baseName}_export.jpg`
+        : `${baseName}_export.mp4`;
+
+    rnLogger.log(
+      `📤 Export done id=${fileId} bytes≈${Math.round((exportBase64.length * 3) / 4)}`,
+    );
+
+    return {
+      kind: 'base64',
+      payload: {
+        id: fileId,
+        exportBase64,
+        mediaType: media.mediaType,
+        filename,
+        mimeType:
+          blob.type ||
+          (media.mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
+        width,
+        height,
+      },
+    };
   } catch (err) {
     const stage =
       media.mediaType === 'photo'
@@ -156,37 +250,4 @@ export const exportActiveSlideForGallery = async (
     logSaveTechnical(stage, err, {fileId, index});
     throw err;
   }
-
-  let exportBase64: string;
-  try {
-    exportBase64 = await blobToBase64(blob);
-  } catch (err) {
-    logSaveTechnical(SaveExportStage.BASE64_ENCODE, err, {
-      fileId,
-      bytes: blob.size,
-    });
-    throw err;
-  }
-
-  const baseName =
-    media.filename?.replace(/\.[^.]+$/, '') || `mobeet_${fileId}`;
-  const filename =
-    media.mediaType === 'photo'
-      ? `${baseName}_export.jpg`
-      : `${baseName}_export.mp4`;
-
-  rnLogger.log(
-    `📤 Export done id=${fileId} bytes≈${Math.round((exportBase64.length * 3) / 4)}`,
-  );
-
-  return {
-    id: fileId,
-    exportBase64,
-    mediaType: media.mediaType,
-    filename,
-    mimeType:
-      blob.type || (media.mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
-    width,
-    height,
-  };
 };
