@@ -24,7 +24,7 @@ import {
   SaveExportStage,
   throwSaveExportError,
 } from './saveExportDiagnostics';
-import {getExportCanvas, getExportRenderer} from './exportCanvasRegistry';
+import {getExportCanvas} from './exportCanvasRegistry';
 import {DEFAULT_SAVE_CHUNK_BYTES, VIDEO_EXPORT_FPS} from './exportTypes';
 import {blitCanvasToExportSize} from './exportBlit';
 import {mediaUriToBlob} from './mediaUriToBlob';
@@ -122,7 +122,6 @@ export const exportVideoMp4 = async ({
   streamHandoff,
 }: ExportVideoMp4Params): Promise<Blob | void> => {
   const sourceCanvas = getExportCanvas(index);
-  const renderer = getExportRenderer(index);
 
   assertSaveExport(
     sourceCanvas,
@@ -255,7 +254,7 @@ export const exportVideoMp4 = async ({
       const t = nextOutputTime;
 
       try {
-        await feedDecodedFrameToFilteredCanvas(index, sample, renderer);
+        await feedDecodedFrameToFilteredCanvas(index, sample);
         blitCanvasToExportSize(
           sourceCanvas,
           width,

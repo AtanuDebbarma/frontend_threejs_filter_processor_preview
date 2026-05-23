@@ -9,12 +9,10 @@ import {vertexShader, fragmentShader} from '../../assets/shaders';
 import {rnLogger} from '../../utils/rnLogger';
 import {trimBase64} from '../../helpers/other_helpers';
 import {setExportVideo} from '../../helpers/exportVideoRegistry';
-import {getExportRenderer} from '../../helpers/exportCanvasRegistry';
+import {setExportFrameDriver} from '../../helpers/exportFrameDriver';
 import {
   clearExportFrameFeed,
-  markExportFrameRendered,
   signalExportPipelineReady,
-  takePendingExportFrame,
 } from '../../helpers/exportVideoFrameFeed';
 import {defaultEditor, type EditorRecord} from '../../store/editorSlice';
 import {defaultAdjustTransform} from '../../store/adjustSlice';
@@ -87,7 +85,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     url.startsWith('ph:');
 
   // R3F hooks
-  const {viewport, size, gl} = useThree();
+  const {viewport, size, gl, scene, camera} = useThree();
 
   // set DPR
   useEffect(() => {
@@ -101,12 +99,13 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     );
   }, [gl]);
 
-  // Phase B: during Save, paint decoded VideoFrames via VideoFrameTexture (not preview <video> seek).
+  // Phase B: Save export uses VideoFrameTexture + synchronous gl.render (not preview <video> seek).
   useEffect(() => {
     if (!props.isVideo) {
       return;
     }
     if (!isSaveExporting) {
+      setExportFrameDriver(props.index, null);
       if (exportVftRef.current) {
         exportVftRef.current.dispose();
         exportVftRef.current = null;
@@ -130,10 +129,8 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       return vft;
     });
 
-    signalExportPipelineReady(props.index);
-    getExportRenderer(props.index)?.invalidate();
-
     return () => {
+      setExportFrameDriver(props.index, null);
       clearExportFrameFeed(props.index);
       if (exportVftRef.current) {
         exportVftRef.current.dispose();
@@ -519,23 +516,6 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
 
   useFrame(() => {
     if (isSaveExporting && props.isVideo) {
-      if (!exportVftRef.current) {
-        getExportRenderer(props.index)?.invalidate();
-        return;
-      }
-      const pending = takePendingExportFrame(props.index);
-      if (pending) {
-        exportVftRef.current.setFrame(pending.frame);
-        try {
-          pending.frame.close();
-        } catch {
-          /* ignore */
-        }
-        exportVftRef.current.needsUpdate = true;
-        markExportFrameRendered(props.index, pending.generation);
-      } else {
-        exportVftRef.current.needsUpdate = true;
-      }
       return;
     }
 
@@ -889,6 +869,49 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       mat.needsUpdate = true;
     }
   }, [mediaTextureState, props.originalWidth, props.originalHeight, size]);
+
+  // Save export: synchronous gl.render per decoded frame (no useFrame / rAF).
+  useEffect(() => {
+    if (!props.isVideo || !isSaveExporting || !exportVftRef.current) {
+      setExportFrameDriver(props.index, null);
+      return;
+    }
+
+    const vft = exportVftRef.current;
+
+    setExportFrameDriver(props.index, {
+      paintAndRender(frame: VideoFrame) {
+        vft.setFrame(frame);
+        try {
+          frame.close();
+        } catch {
+          /* ignore */
+        }
+        vft.needsUpdate = true;
+
+        const mat = materialRef.current as THREE.ShaderMaterial | null;
+        if (mat?.uniforms?.tDiffuse) {
+          mat.uniforms.tDiffuse.value = vft;
+        }
+
+        gl.setRenderTarget(null);
+        gl.render(scene, camera);
+      },
+    });
+    signalExportPipelineReady(props.index);
+
+    return () => {
+      setExportFrameDriver(props.index, null);
+    };
+  }, [
+    isSaveExporting,
+    props.isVideo,
+    props.index,
+    mediaTextureState,
+    gl,
+    scene,
+    camera,
+  ]);
 
   // update material uniforms if filter params change
   useEffect(() => {
