@@ -46,7 +46,6 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   //  queue for textures that should be disposed only after render commit
   const toDisposeRef = useRef<THREE.Texture[]>([]);
   const exportVftRef = useRef<THREE.VideoFrameTexture | null>(null);
-  const previewTextureRef = useRef<THREE.Texture | null>(null);
 
   const activeFilter = appStore(state => state.activeFilter);
   const setIsApplyingFilter = appStore(state => state.setIsApplyingFilter);
@@ -111,10 +110,6 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         exportVftRef.current = null;
       }
       clearExportFrameFeed(props.index);
-      if (previewTextureRef.current) {
-        setMediaTextureState(previewTextureRef.current);
-        previewTextureRef.current = null;
-      }
       return;
     }
 
@@ -123,11 +118,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     vft.magFilter = THREE.LinearFilter;
     vft.generateMipmaps = false;
     exportVftRef.current = vft;
-
-    setMediaTextureState(prev => {
-      previewTextureRef.current = prev;
-      return vft;
-    });
+    // Keep preview on VideoTexture (paused last frame); export paints via exportVftRef only.
 
     return () => {
       setExportFrameDriver(props.index, null);
@@ -882,20 +873,27 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     setExportFrameDriver(props.index, {
       paintAndRender(frame: VideoFrame) {
         vft.setFrame(frame);
-        try {
-          frame.close();
-        } catch {
-          /* ignore */
-        }
         vft.needsUpdate = true;
 
         const mat = materialRef.current as THREE.ShaderMaterial | null;
         if (mat?.uniforms?.tDiffuse) {
           mat.uniforms.tDiffuse.value = vft;
         }
+        if (mat?.uniforms?.u_texel) {
+          const w = Math.max(1, frame.displayWidth);
+          const h = Math.max(1, frame.displayHeight);
+          mat.uniforms.u_texel.value.set(1 / w, 1 / h);
+        }
 
         gl.setRenderTarget(null);
         gl.render(scene, camera);
+
+        // Upload happens during render — close only after GPU has copied the frame.
+        try {
+          frame.close();
+        } catch {
+          /* ignore */
+        }
       },
     });
     signalExportPipelineReady(props.index);
@@ -903,15 +901,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     return () => {
       setExportFrameDriver(props.index, null);
     };
-  }, [
-    isSaveExporting,
-    props.isVideo,
-    props.index,
-    mediaTextureState,
-    gl,
-    scene,
-    camera,
-  ]);
+  }, [isSaveExporting, props.isVideo, props.index, gl, scene, camera]);
 
   // update material uniforms if filter params change
   useEffect(() => {
