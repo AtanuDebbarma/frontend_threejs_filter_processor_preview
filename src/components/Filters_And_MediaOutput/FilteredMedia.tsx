@@ -9,6 +9,11 @@ import {vertexShader, fragmentShader} from '../../assets/shaders';
 import {rnLogger} from '../../utils/rnLogger';
 import {trimBase64} from '../../helpers/other_helpers';
 import {setExportVideo} from '../../helpers/exportVideoRegistry';
+import {
+  clearExportFrameFeed,
+  markExportFrameRendered,
+  takePendingExportFrame,
+} from '../../helpers/exportVideoFrameFeed';
 import {defaultEditor, type EditorRecord} from '../../store/editorSlice';
 import {defaultAdjustTransform} from '../../store/adjustSlice';
 
@@ -40,6 +45,8 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   const didSetApplyingRef = useRef<boolean>(false);
   //  queue for textures that should be disposed only after render commit
   const toDisposeRef = useRef<THREE.Texture[]>([]);
+  const exportVftRef = useRef<THREE.VideoFrameTexture | null>(null);
+  const previewTextureRef = useRef<THREE.Texture | null>(null);
 
   const activeFilter = appStore(state => state.activeFilter);
   const setIsApplyingFilter = appStore(state => state.setIsApplyingFilter);
@@ -91,6 +98,44 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       `DPR check → Web: ${window.devicePixelRatio}, RN: ${appStore.getState().dpr}, GL: ${gl.getPixelRatio()}`,
     );
   }, [gl]);
+
+  // Phase B: during Save, paint decoded VideoFrames via VideoFrameTexture (not preview <video> seek).
+  useEffect(() => {
+    if (!props.isVideo) {
+      return;
+    }
+    if (!isSaveExporting) {
+      if (exportVftRef.current) {
+        exportVftRef.current.dispose();
+        exportVftRef.current = null;
+      }
+      clearExportFrameFeed(props.index);
+      if (previewTextureRef.current) {
+        setMediaTextureState(previewTextureRef.current);
+        previewTextureRef.current = null;
+      }
+      return;
+    }
+
+    const vft = new THREE.VideoFrameTexture();
+    vft.minFilter = THREE.LinearFilter;
+    vft.magFilter = THREE.LinearFilter;
+    vft.generateMipmaps = false;
+    exportVftRef.current = vft;
+
+    setMediaTextureState(prev => {
+      previewTextureRef.current = prev;
+      return vft;
+    });
+
+    return () => {
+      clearExportFrameFeed(props.index);
+      if (exportVftRef.current) {
+        exportVftRef.current.dispose();
+        exportVftRef.current = null;
+      }
+    };
+  }, [isSaveExporting, props.isVideo, props.index]);
 
   useEffect(() => {
     if (!gl) return;
@@ -467,8 +512,24 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.uri, props.isVideo, gl]);
 
-  // Update the useFrame hook to check canplay status:
   useFrame(() => {
+    if (isSaveExporting && props.isVideo && exportVftRef.current) {
+      const pending = takePendingExportFrame(props.index);
+      if (pending) {
+        exportVftRef.current.setFrame(pending.frame);
+        try {
+          pending.frame.close();
+        } catch {
+          /* ignore */
+        }
+        exportVftRef.current.needsUpdate = true;
+        markExportFrameRendered(props.index, pending.generation);
+      } else {
+        exportVftRef.current.needsUpdate = true;
+      }
+      return;
+    }
+
     if (mediaTextureState instanceof THREE.VideoTexture) {
       const videoElem = (mediaTextureState as any).__videoElement as
         | HTMLVideoElement
@@ -482,9 +543,8 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       }
 
       const playing = !videoElem.paused && !videoElem.ended;
-      const exportSeek = isSaveExporting && props.isVideo;
 
-      if (playing || exportSeek) {
+      if (playing) {
         mediaTextureState.needsUpdate = true;
       }
     }

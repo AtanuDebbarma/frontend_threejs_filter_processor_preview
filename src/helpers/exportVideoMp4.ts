@@ -10,7 +10,9 @@ import {
   Input,
   Mp4OutputFormat,
   Output,
+  VideoSampleSink,
   type AudioCodec,
+  type Target,
   getFirstEncodableVideoCodec,
 } from 'mediabunny';
 import {rnLogger} from '../utils/rnLogger';
@@ -20,43 +22,25 @@ import {
   logSaveTechnical,
   logSaveWarn,
   SaveExportStage,
+  throwSaveExportError,
 } from './saveExportDiagnostics';
 import {getExportCanvas, getExportRenderer} from './exportCanvasRegistry';
-import {VIDEO_EXPORT_FPS} from './exportTypes';
+import {DEFAULT_SAVE_CHUNK_BYTES, VIDEO_EXPORT_FPS} from './exportTypes';
 import {blitCanvasToExportSize} from './exportBlit';
 import {mediaUriToBlob} from './mediaUriToBlob';
-import {getExportVideo} from './exportVideoRegistry';
+import {
+  clearExportFrameFeed,
+  feedDecodedFrameToFilteredCanvas,
+} from './exportVideoFrameFeed';
+import {createAppendOnlyMuxTarget} from './exportMuxStreamTarget';
+import {createExportProgressReporter} from './exportProgress';
+import {postSaveExportChunk} from './saveBridge';
 
-const waitAnimationFrames = (count = 2): Promise<void> =>
-  new Promise(resolve => {
-    let remaining = count;
-    const tick = () => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        resolve();
-      } else {
-        requestAnimationFrame(tick);
-      }
-    };
-    requestAnimationFrame(tick);
-  });
-
-const waitForVideoSeek = (video: HTMLVideoElement): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(
-      () => reject(new Error('Video seek timed out')),
-      20_000,
-    );
-    const finish = () => {
-      window.clearTimeout(timeout);
-      resolve();
-    };
-    if (typeof video.requestVideoFrameCallback === 'function') {
-      video.requestVideoFrameCallback(finish);
-    } else {
-      video.addEventListener('seeked', finish, {once: true});
-    }
-  });
+export type ExportVideoStreamHandoff = {
+  id: string;
+  index: number;
+  chunkSizeBytes?: number;
+};
 
 export type ExportVideoMp4Params = {
   index: number;
@@ -65,6 +49,19 @@ export type ExportVideoMp4Params = {
   height: number;
   backgroundColor: string;
   muted: boolean;
+  fileId: string;
+  /** Phase E: stream mux bytes to RN instead of one Blob. */
+  streamHandoff?: ExportVideoStreamHandoff;
+};
+
+const uint8ToBase64 = (bytes: Uint8Array): string => {
+  let binary = '';
+  const step = 0x8000;
+  for (let i = 0; i < bytes.length; i += step) {
+    const slice = bytes.subarray(i, i + step);
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
 };
 
 const loadAudioPackets = async (
@@ -96,8 +93,22 @@ const loadAudioPackets = async (
   }
 };
 
+const resolveVideoDuration = async (input: Input): Promise<number> => {
+  const fromMeta = await input.getDurationFromMetadata();
+  if (typeof fromMeta === 'number' && fromMeta > 0) {
+    return fromMeta;
+  }
+  const computed = await input.computeDuration();
+  assertSaveExportCondition(
+    Number.isFinite(computed) && computed > 0,
+    SaveExportStage.VIDEO_VALIDATE,
+    'Could not determine video duration for export',
+  );
+  return computed;
+};
+
 /**
- * Encodes filtered WebGL preview frames to MP4 (H.264 + source audio when readable).
+ * Encodes filtered WebGL frames to MP4 via sequential Mediabunny decode (no preview-video seek).
  */
 export const exportVideoMp4 = async ({
   index,
@@ -106,9 +117,10 @@ export const exportVideoMp4 = async ({
   height,
   backgroundColor,
   muted,
-}: ExportVideoMp4Params): Promise<Blob> => {
+  fileId,
+  streamHandoff,
+}: ExportVideoMp4Params): Promise<Blob | void> => {
   const sourceCanvas = getExportCanvas(index);
-  const video = getExportVideo(index);
   const renderer = getExportRenderer(index);
 
   assertSaveExport(
@@ -120,16 +132,6 @@ export const exportVideoMp4 = async ({
     sourceCanvas.width >= 2 && sourceCanvas.height >= 2,
     SaveExportStage.VALIDATE_CANVAS,
     'Preview canvas not ready — wait for the editor to finish loading',
-  );
-  assertSaveExport(
-    video,
-    SaveExportStage.VIDEO_VALIDATE,
-    'Video element not ready for export',
-  );
-  assertSaveExportCondition(
-    Number.isFinite(video.duration) && video.duration > 0,
-    SaveExportStage.VIDEO_VALIDATE,
-    'Video element not ready for export',
   );
 
   const videoCodec = await getFirstEncodableVideoCodec(['avc'], {
@@ -143,34 +145,74 @@ export const exportVideoMp4 = async ({
     'H.264 video encoding is not supported on this device',
   );
 
+  const blob = await mediaUriToBlob(uri);
+  const input = new Input({
+    source: new BlobSource(blob),
+    formats: ALL_FORMATS,
+  });
+  const videoTrack = await input.getPrimaryVideoTrack();
+  assertSaveExport(
+    videoTrack,
+    SaveExportStage.VIDEO_VALIDATE,
+    'No video track found in source file',
+  );
+
+  if (!(await videoTrack.canDecode())) {
+    throwSaveExportError(
+      SaveExportStage.VIDEO_CODEC,
+      'Video track cannot be decoded in this WebView',
+    );
+  }
+
+  const duration = await resolveVideoDuration(input);
+  const frameDuration = 1 / VIDEO_EXPORT_FPS;
+  const totalFrames = Math.max(1, Math.ceil(duration * VIDEO_EXPORT_FPS));
+
   const frameCanvas = document.createElement('canvas');
   frameCanvas.width = width;
   frameCanvas.height = height;
 
-  const renderFilteredFrameAt = async (timeSec: number): Promise<void> => {
-    const clamped = Math.min(
-      Math.max(0, timeSec),
-      Math.max(0, video.duration - 0.001),
-    );
-    video.pause();
-    video.currentTime = clamped;
-    await waitForVideoSeek(video);
-    renderer?.invalidate();
-    await waitAnimationFrames(2);
-    blitCanvasToExportSize(
-      sourceCanvas,
-      width,
-      height,
-      backgroundColor,
-      frameCanvas,
-    );
-  };
-
   const audioData = muted ? null : await loadAudioPackets(uri);
 
-  const target = new BufferTarget();
+  const progress = createExportProgressReporter(fileId);
+  progress(0, 'encoding', true);
+
+  let muxSeq = 0;
+  const chunkSize = streamHandoff?.chunkSizeBytes ?? DEFAULT_SAVE_CHUNK_BYTES;
+
+  let target: Target;
+  if (streamHandoff) {
+    target = createAppendOnlyMuxTarget(async (data, done) => {
+      if (data.length > 0) {
+        postSaveExportChunk({
+          id: streamHandoff.id,
+          index: streamHandoff.index,
+          seq: muxSeq,
+          dataBase64: uint8ToBase64(data),
+          done: false,
+        });
+        muxSeq += 1;
+      }
+      if (done) {
+        postSaveExportChunk({
+          id: streamHandoff.id,
+          index: streamHandoff.index,
+          seq: muxSeq,
+          dataBase64: '',
+          done: true,
+        });
+        muxSeq += 1;
+        progress(100, 'writing', true);
+      }
+    }, chunkSize);
+  } else {
+    target = new BufferTarget();
+  }
+
   const output = new Output({
-    format: new Mp4OutputFormat({fastStart: false}),
+    format: new Mp4OutputFormat({
+      fastStart: streamHandoff ? 'fragmented' : false,
+    }),
     target,
   });
 
@@ -187,64 +229,93 @@ export const exportVideoMp4 = async ({
     output.addAudioTrack(audioSource);
   }
 
-  const wasPlaying = !video.paused;
-  video.pause();
-
-  const frameDuration = 1 / VIDEO_EXPORT_FPS;
-  const totalFrames = Math.max(1, Math.ceil(video.duration * VIDEO_EXPORT_FPS));
+  const encodeStart = performance.now();
+  let encodedFrames = 0;
+  let nextOutputTime = 0;
 
   try {
-    try {
-      await output.start();
+    await output.start();
 
-      for (let i = 0; i < totalFrames; i++) {
-        const t = i * frameDuration;
-        if (t >= video.duration) {
-          break;
-        }
-        try {
-          await renderFilteredFrameAt(t);
-          await videoSource.add(t, frameDuration);
-        } catch (frameErr) {
-          logSaveTechnical(SaveExportStage.VIDEO_ENCODE_LOOP, frameErr, {
-            index,
-            frame: i + 1,
-            totalFrames,
-            t,
-          });
-          throw frameErr;
-        }
-        if (i % 15 === 0 || i === totalFrames - 1) {
+    const sink = new VideoSampleSink(videoTrack);
+
+    for await (const sample of sink.samples(0, duration)) {
+      if (nextOutputTime >= duration) {
+        sample.close();
+        break;
+      }
+
+      if (sample.timestamp + sample.duration < nextOutputTime) {
+        sample.close();
+        continue;
+      }
+
+      const t = nextOutputTime;
+
+      try {
+        await feedDecodedFrameToFilteredCanvas(index, sample, renderer);
+        blitCanvasToExportSize(
+          sourceCanvas,
+          width,
+          height,
+          backgroundColor,
+          frameCanvas,
+        );
+        await videoSource.add(t, frameDuration);
+        encodedFrames += 1;
+        nextOutputTime += frameDuration;
+
+        if (
+          encodedFrames % 15 === 0 ||
+          nextOutputTime >= duration - frameDuration
+        ) {
+          const pct = Math.round((encodedFrames / totalFrames) * 100);
+          progress(pct, 'encoding');
           rnLogger.log(
-            `📤 Video encode ${Math.round(((i + 1) / totalFrames) * 100)}% frame ${i + 1}/${totalFrames}`,
+            `📤 Video encode (sequential) ${pct}% frame ${encodedFrames}/${totalFrames}`,
           );
         }
+      } catch (frameErr) {
+        logSaveTechnical(SaveExportStage.VIDEO_ENCODE_LOOP, frameErr, {
+          index,
+          frame: encodedFrames + 1,
+          totalFrames,
+          t,
+        });
+        throw frameErr;
       }
-
-      videoSource.close();
-
-      if (audioSource && audioData) {
-        for (const packet of audioData.packets) {
-          await audioSource.add(packet);
-        }
-        audioSource.close();
-      }
-
-      await output.finalize();
-    } catch (encodeErr) {
-      logSaveTechnical(SaveExportStage.VIDEO_MUX_FINALIZE, encodeErr, {
-        index,
-        totalFrames,
-      });
-      throw encodeErr;
     }
+
+    videoSource.close();
+
+    if (audioSource && audioData) {
+      for (const packet of audioData.packets) {
+        await audioSource.add(packet);
+      }
+      audioSource.close();
+    }
+
+    await output.finalize();
+    progress(100, 'encoding', true);
+
+    rnLogger.log(
+      `📤 Video encode done: ${encodedFrames} frames in ${Math.round(performance.now() - encodeStart)}ms`,
+    );
+  } catch (encodeErr) {
+    logSaveTechnical(SaveExportStage.VIDEO_MUX_FINALIZE, encodeErr, {
+      index,
+      totalFrames,
+      encodedFrames,
+    });
+    throw encodeErr;
   } finally {
-    if (wasPlaying) {
-      void video.play().catch(() => undefined);
-    }
+    clearExportFrameFeed(index);
   }
 
-  const buffer = target.buffer;
+  if (streamHandoff) {
+    return;
+  }
+
+  const buffer = (target as BufferTarget).buffer;
   assertSaveExport(
     buffer,
     SaveExportStage.VIDEO_EMPTY_OUTPUT,

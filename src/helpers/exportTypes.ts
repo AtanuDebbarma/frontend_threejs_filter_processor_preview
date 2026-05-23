@@ -42,6 +42,19 @@ export const resolveExportDimensions = (
     : EXPORT_DIMENSIONS_FULL[mode];
 };
 
+export type ExportProgressStage = 'encoding' | 'writing';
+
+export type ExportProgressPayload = {
+  id: string;
+  percent: number;
+  stage: ExportProgressStage;
+};
+
+/** Photos: single base64 message when under size cap. Videos: chunked mux (Phase E). */
+export const SAVE_PHOTO_MAX_BLOB_BYTES = 5 * 1024 * 1024;
+
+export const DEFAULT_SAVE_CHUNK_BYTES = 512 * 1024;
+
 export type StartSaveExportPayload = {
   id: string;
   index: number;
@@ -50,6 +63,24 @@ export type StartSaveExportPayload = {
   /** Optional — web resolves via resolveExportDimensions if omitted. */
   width?: number;
   height?: number;
+  /** RN pre-created file path for video chunked Save. */
+  writePath?: string;
+  mime?: string;
+  chunkSizeBytes?: number;
+};
+
+export type SaveExportChunkPayload = {
+  id: string;
+  index: number;
+  seq: number;
+  dataBase64: string;
+  done?: boolean;
+};
+
+export type SaveExportCompletePayload = {
+  id: string;
+  localPath: string;
+  mediaType: 'photo' | 'video';
 };
 
 export type SaveExportDataPayload = {

@@ -27,17 +27,14 @@ import {StickerMenu} from './components/Menus/StickerMenu';
 import {TextMenu} from './components/Menus/TextMenu';
 import {EditorMenuMain} from './components/Menus/EditorMenuMain';
 import {AdjustMenu} from './components/Menus/AdjustMenu';
-import type {AdjustRecord} from './store/adjustSlice';
-import type {EditorRecord} from './store/editorSlice';
-import {normalizeForExport} from './helpers/exportHelpers';
 import {exportActiveSlideForGallery} from './helpers/exportMedia';
+import {pauseAllPreviewVideos} from './helpers/exportPreviewControl';
 import {SaveExportStage} from './helpers/saveExportDiagnostics';
 import {
   isStartSaveExportPayload,
   postSaveExportData,
   postSaveExportFailed,
 } from './helpers/saveBridge';
-import {EXPORT_DIMENSIONS_FULL} from './helpers/exportTypes';
 
 export type {
   AppColors,
@@ -56,20 +53,11 @@ const App = (): React.JSX.Element => {
   const activeFilter: FilterItem = appStore(state => state.activeFilter);
   const mediaFiles = appStore(state => state.mediaFiles);
   const setMediaFiles = appStore(state => state.setMediaFiles);
-  const requestedExport = appStore(state => state.requestedExport);
-  const setRequestedExport = appStore(state => state.setRequestedExport);
   const setIsSaveExporting = appStore(state => state.setIsSaveExporting);
   const setIsModalOpen = appStore(state => state.setIsModalOpen);
-  const videoMutedState = appStore.getState().videoMutedState;
   const tagMode = appStore(state => state.tagMode);
   const storeDpr = appStore(state => state.dpr);
   const setDpr = appStore(state => state.setDpr);
-  const currentEditorValues: EditorRecord = appStore(
-    state => state.editorByIndex,
-  );
-  const currentStoreAdjust: AdjustRecord = appStore(
-    state => state.adjustByIndex,
-  );
   const [post, setPost] = React.useState(true);
   const [isInitializing, setInitializing] = React.useState(true);
   const [appColors, setAppColors] = React.useState<AppColors>({
@@ -87,8 +75,6 @@ const App = (): React.JSX.Element => {
 
   const activeButton = appStore(state => state.activeButton);
   const buttonsOpen = activeButton !== null;
-  const canvasSize = appStore(state => state.canvasSize);
-
   const {handleRnMessage: handleLogConfigMessage, applyLogConfigFromHydration} =
     useEditorLogging();
 
@@ -191,38 +177,9 @@ const App = (): React.JSX.Element => {
           case SET_LOG_CONFIG_MESSAGE:
             break;
 
-          case 'HYDRATE': {
-            const data = msg.payload as HydrationPayload | undefined;
-            if (!data?.file?.length) {
-              rnLogger.warn('⚠️ HYDRATE: missing or empty payload');
-              break;
-            }
-            rnLogger.log('📥 HYDRATE postMessage');
-            applyLogConfigFromHydration(data.production);
-            void applyHydrationFromPayload(data, 'HYDRATE postMessage', {
-              ...hydrationHandlers,
-            });
-            break;
-          }
-
-          case 'UPDATE_ASSETS': {
-            const data = msg.payload as HydrationPayload | undefined;
-            if (!data?.file?.length) {
-              rnLogger.warn('⚠️ UPDATE_ASSETS: missing or empty payload');
-              break;
-            }
-            rnLogger.log('📥 UPDATE_ASSETS postMessage');
-            applyLogConfigFromHydration(data.production);
-            void applyHydrationFromPayload(data, 'UPDATE_ASSETS', {
-              ...hydrationHandlers,
-            });
-            break;
-          }
-
           case 'PATCH_STATE': {
             const data: PatchPayload = msg.payload;
             rnLogger.log('🎨 PATCH_STATE update:', data);
-            if (data.requestedExport) setRequestedExport(true);
             if (data.appColors) setAppColors(data.appColors);
             break;
           }
@@ -234,14 +191,8 @@ const App = (): React.JSX.Element => {
             break;
           }
 
-          case 'EXPORT_DATA_RECEIVED': {
-            rnLogger.log('✅ Export data received');
-            setRequestedExport(false);
-            break;
-          }
-
-          case 'SAVE_DATA_RECEIVED': {
-            rnLogger.log('✅ Save data received from RN');
+          case 'SAVE_EXPORT_COMPLETE': {
+            rnLogger.log('✅ Save export complete from RN');
             setIsSaveExporting(false);
             break;
           }
@@ -260,28 +211,32 @@ const App = (): React.JSX.Element => {
               setIsSaveExporting(false);
               break;
             }
-            const {id, index} = msg.payload;
+            const {id, index, writePath, chunkSizeBytes} = msg.payload;
             setIsSaveExporting(true);
+            pauseAllPreviewVideos();
             void (async () => {
               try {
                 const result = await exportActiveSlideForGallery(
                   id,
                   index,
                   'post',
+                  {writePath, chunkSizeBytes},
                 );
-                try {
-                  postSaveExportData(result);
-                } catch (postErr) {
-                  postSaveExportFailed({
-                    id,
-                    error:
-                      postErr instanceof Error
-                        ? postErr.message
-                        : 'SAVE_EXPORT_DATA post failed',
-                    mediaType: result.mediaType,
-                    stage: SaveExportStage.BRIDGE_POST_DATA,
-                  });
-                  setIsSaveExporting(false);
+                if (result.kind === 'base64') {
+                  try {
+                    postSaveExportData(result.payload);
+                  } catch (postErr) {
+                    postSaveExportFailed({
+                      id,
+                      error:
+                        postErr instanceof Error
+                          ? postErr.message
+                          : 'SAVE_EXPORT_DATA post failed',
+                      mediaType: result.payload.mediaType,
+                      stage: SaveExportStage.BRIDGE_POST_DATA,
+                    });
+                    setIsSaveExporting(false);
+                  }
                 }
               } catch (err) {
                 const mediaType =
@@ -332,60 +287,12 @@ const App = (): React.JSX.Element => {
     handleLogConfigMessage,
     applyLogConfigFromHydration,
     setIsModalOpen,
-    setRequestedExport,
     setIsSaveExporting,
   ]);
 
   useEffect(() => {
     rnLogger.log('🎨 Active filter changed:', activeFilter);
   }, [activeFilter]);
-
-  useEffect(() => {
-    try {
-      if (requestedExport) {
-        const payload = normalizeForExport({
-          activeFilter,
-          currentEditorValues,
-          currentStoreAdjust,
-          videoMutedState,
-          mediaFiles,
-        });
-
-        rnLogger.log(
-          '🎨 Sending current active values to RN (export):',
-          JSON.stringify(payload, null, 2),
-        );
-
-        if (
-          window.ReactNativeWebView &&
-          canvasSize.width > 0 &&
-          canvasSize.height > 0
-        ) {
-          const {width, height} = EXPORT_DIMENSIONS_FULL.post;
-          window.ReactNativeWebView.postMessage(
-            JSON.stringify({
-              type: 'CURRENT_ACTIVE_VALUES',
-              payload: {
-                post: post,
-                save: null,
-                canvasWidth: width,
-                canvasHeight: height,
-                ...payload,
-              },
-            }),
-          );
-        }
-      }
-    } catch (error) {
-      rnLogger.componentLog(
-        'App',
-        'error',
-        `Failed to send current active values to RN: ${error}`,
-        error,
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestedExport, canvasSize]);
 
   useEffect(() => {
     try {
