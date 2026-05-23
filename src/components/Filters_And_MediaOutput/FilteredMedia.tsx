@@ -9,9 +9,11 @@ import {vertexShader, fragmentShader} from '../../assets/shaders';
 import {rnLogger} from '../../utils/rnLogger';
 import {trimBase64} from '../../helpers/other_helpers';
 import {setExportVideo} from '../../helpers/exportVideoRegistry';
+import {getExportRenderer} from '../../helpers/exportCanvasRegistry';
 import {
   clearExportFrameFeed,
   markExportFrameRendered,
+  signalExportPipelineReady,
   takePendingExportFrame,
 } from '../../helpers/exportVideoFrameFeed';
 import {defaultEditor, type EditorRecord} from '../../store/editorSlice';
@@ -127,6 +129,9 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       previewTextureRef.current = prev;
       return vft;
     });
+
+    signalExportPipelineReady(props.index);
+    getExportRenderer(props.index)?.invalidate();
 
     return () => {
       clearExportFrameFeed(props.index);
@@ -513,7 +518,11 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   }, [props.uri, props.isVideo, gl]);
 
   useFrame(() => {
-    if (isSaveExporting && props.isVideo && exportVftRef.current) {
+    if (isSaveExporting && props.isVideo) {
+      if (!exportVftRef.current) {
+        getExportRenderer(props.index)?.invalidate();
+        return;
+      }
       const pending = takePendingExportFrame(props.index);
       if (pending) {
         exportVftRef.current.setFrame(pending.frame);
