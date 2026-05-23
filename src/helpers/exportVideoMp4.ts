@@ -65,9 +65,15 @@ const uint8ToBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
+type LoadedAudioForMux = {
+  codec: AudioCodec;
+  packets: EncodedPacket[];
+  decoderConfig: AudioDecoderConfig;
+};
+
 const loadAudioPackets = async (
   uri: string,
-): Promise<{codec: AudioCodec; packets: EncodedPacket[]} | null> => {
+): Promise<LoadedAudioForMux | null> => {
   try {
     const blob = await mediaUriToBlob(uri);
     const input = new Input({
@@ -82,12 +88,22 @@ const loadAudioPackets = async (
     if (!codec) {
       return null;
     }
+    const decoderConfig = await audioTrack.getDecoderConfig();
+    if (!decoderConfig) {
+      logSaveWarn(SaveExportStage.VIDEO_AUDIO_READ, 'No audio decoder config', {
+        uri: uri.slice(0, 80),
+      });
+      return null;
+    }
     const packets: EncodedPacket[] = [];
     const sink = new EncodedPacketSink(audioTrack);
     for await (const packet of sink.packets()) {
       packets.push(packet);
     }
-    return {codec: codec as AudioCodec, packets};
+    if (packets.length === 0) {
+      return null;
+    }
+    return {codec: codec as AudioCodec, packets, decoderConfig};
   } catch (err) {
     logSaveWarn(SaveExportStage.VIDEO_AUDIO_READ, err, {uri: uri.slice(0, 80)});
     return null;
@@ -290,8 +306,11 @@ export const exportVideoMp4 = async ({
     videoSource.close();
 
     if (audioSource && audioData) {
+      const audioMeta: EncodedAudioChunkMetadata = {
+        decoderConfig: audioData.decoderConfig,
+      };
       for (const packet of audioData.packets) {
-        await audioSource.add(packet);
+        await audioSource.add(packet, audioMeta);
       }
       audioSource.close();
     }
