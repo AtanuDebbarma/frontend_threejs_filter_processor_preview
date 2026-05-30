@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {appStore} from '../../store/appStore';
+import {appStore} from '../../../store/appStore';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {
   faSliders,
@@ -8,8 +8,8 @@ import {
   faArrowLeft,
   faFileExport,
 } from '@fortawesome/free-solid-svg-icons';
-import type {AppColors, Insets} from '../../App';
-import {requestSaveToDevice} from '../../helpers/saveBridge';
+import type {AppColors, Insets} from '../../../App';
+import {requestSaveToDevice} from '../../../helpers/saveBridge';
 type Props = {
   appColors: AppColors;
   safeInsets: Insets;
@@ -29,7 +29,7 @@ export const EditorMenuMain = ({
   }, [activeIndex, mediaFiles]);
 
   const handleButtonToggle = (
-    button: 'adjust' | 'text' | 'audio' | 'editor',
+    button: 'adjust' | 'text' | 'audio' | 'editor' | 'mainMenu',
     e: React.MouseEvent<HTMLButtonElement>,
   ) => {
     e.preventDefault();
@@ -53,12 +53,12 @@ export const EditorMenuMain = ({
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setActiveButton(null);
+    setActiveButton('mainMenu');
   };
 
   return (
     <footer
-      className="z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
+      className="z-5000 flex h-[20%] flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
       style={{
         backgroundColor: appColors.bottomMenuBackground,
         paddingBottom: `${safeInsets.bottom + 10}px`,

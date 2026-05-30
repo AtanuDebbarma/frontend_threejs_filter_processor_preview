@@ -2,6 +2,7 @@ import {Canvas} from '@react-three/fiber';
 import React, {useEffect} from 'react';
 import type {MediaItem} from '../../hooks/useVerifiedMediaFiles';
 import {FilteredMedia} from './FilteredMedia';
+import {TextLayersCanvas} from './TextLayersCanvas';
 import {
   setExportCanvas,
   setExportRenderer,
@@ -99,6 +100,7 @@ export const MediaCanvas = ({
           muted={mutedMap ? mutedMap[index] : false}
           index={index}
         />
+        <TextLayersCanvas index={index} mediaId={id} />
       </Canvas>
     </div>
   );

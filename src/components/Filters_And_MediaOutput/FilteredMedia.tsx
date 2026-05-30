@@ -462,9 +462,28 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       );
     };
 
+    const setVideoPlaybackTime = appStore.getState().setVideoPlaybackTime;
+    const syncPlaybackTime = () => {
+      if (!Number.isFinite(videoEl.currentTime) || videoEl.currentTime < 0) {
+        return;
+      }
+      setVideoPlaybackTime(props.index, props.id, videoEl.currentTime);
+    };
+
+    let lastTimeUpdateMs = 0;
+    const onTimeUpdate = () => {
+      const now = Date.now();
+      if (now - lastTimeUpdateMs < 250) return;
+      lastTimeUpdateMs = now;
+      syncPlaybackTime();
+    };
+
     videoEl.addEventListener('loadedmetadata', onMetadata);
     videoEl.addEventListener('canplay', onCanPlay);
     videoEl.addEventListener('error', onError);
+    videoEl.addEventListener('timeupdate', onTimeUpdate);
+    videoEl.addEventListener('pause', syncPlaybackTime);
+    videoEl.addEventListener('seeked', syncPlaybackTime);
 
     if (props.handleTap) videoEl.addEventListener('click', props.handleTap);
 
@@ -472,6 +491,9 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       videoEl.removeEventListener('loadedmetadata', onMetadata);
       videoEl.removeEventListener('canplay', onCanPlay);
       videoEl.removeEventListener('error', onError);
+      videoEl.removeEventListener('timeupdate', onTimeUpdate);
+      videoEl.removeEventListener('pause', syncPlaybackTime);
+      videoEl.removeEventListener('seeked', syncPlaybackTime);
       if (props.handleTap)
         videoEl.removeEventListener('click', props.handleTap);
       if (props.videoRef && props.videoRef.current === videoEl)

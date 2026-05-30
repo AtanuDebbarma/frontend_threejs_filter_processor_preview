@@ -22,6 +22,8 @@ export type HydrationPayload = {
   insets: Insets;
   /** When true, web logs are not forwarded to RN (SET_LOG_CONFIG can also set this). */
   production?: boolean;
+  /** S3 upload URL from RN hydration (§0.12). */
+  uploadEndpoint?: string;
 };
 
 export type EditorLogConfigPayload = {

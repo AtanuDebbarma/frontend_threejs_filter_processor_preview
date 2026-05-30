@@ -18,7 +18,7 @@ export const StickerMenu = ({
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setTimeout(() => {
-      setActiveButton(null);
+      setActiveButton('mainMenu');
     }, 200);
   };
   return (

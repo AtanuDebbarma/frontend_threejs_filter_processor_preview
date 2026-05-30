@@ -13,7 +13,7 @@ import {
   setupConsoleInterception,
   setupGlobalErrorHandling,
 } from './utils/rnLogger';
-import {ClipLoader} from 'react-spinners';
+import {Loader} from './components/shared/Loader';
 import {applyHydrationFromPayload} from './helpers/hydrationBridge';
 import {
   useEditorLogging,
@@ -21,11 +21,11 @@ import {
 } from './hooks/useEditorLogging';
 import {AudioMenu} from './components/Menus/AudioMenu';
 import BottomBar from './components/Menus/BottomBar';
-import {EditorMenu} from './components/Menus/EditorMenu';
+import {EditorMenu} from './components/Menus/EditorMenus/EditorMenu';
 import {FilterMenu} from './components/Menus/FilterMenu';
 import {StickerMenu} from './components/Menus/StickerMenu';
-import {TextMenu} from './components/Menus/TextMenu';
-import {EditorMenuMain} from './components/Menus/EditorMenuMain';
+import {TextMenu} from './components/Menus/TextMenus/TextMenu';
+import {EditorMenuMain} from './components/Menus/EditorMenus/EditorMenuMain';
 import {AdjustMenu} from './components/Menus/AdjustMenu';
 import {exportActiveSlideForGallery} from './helpers/exportMedia';
 import {pauseAllPreviewVideos} from './helpers/exportPreviewControl';
@@ -35,6 +35,12 @@ import {
   postSaveExportData,
   postSaveExportFailed,
 } from './helpers/saveBridge';
+import {
+  isStartPostExportPayload,
+  postPostExportAck,
+  postPostExportFailed,
+} from './helpers/postBridge';
+import {runPostExportBatch} from './helpers/postExportMedia';
 
 export type {
   AppColors,
@@ -48,12 +54,34 @@ import type {
   Insets,
   PatchPayload,
 } from './types/webBridgeTypes';
+import {FontStyleMenu} from './components/Menus/TextMenus/FontStyleMenu';
+import {TextBackgroundMenu} from './components/Menus/TextMenus/TextBackgroundMenu';
+import {TextContentOverlayArea} from './components/Menus/TextMenus/TextContentOverlayArea';
+import type {ButtonStateType} from './store/buttonSlices';
+
+/** Browser dev only (`bun run dev`). RN WebView uses inject + mediaReady instead. */
+// const ENABLE_DEV_MOCK_HYDRATION = import.meta.env.DEV;
+
+/** Keep text preview visible while any text sub-menu is open. */
+const TEXT_FLOW_BUTTONS: ReadonlySet<ButtonStateType> = new Set([
+  'text',
+  'fontStyle',
+  'underline',
+  'textBackground',
+  'textColor',
+  'textBackgroundColor',
+]);
 
 const App = (): React.JSX.Element => {
   const activeFilter: FilterItem = appStore(state => state.activeFilter);
   const mediaFiles = appStore(state => state.mediaFiles);
   const setMediaFiles = appStore(state => state.setMediaFiles);
   const setIsSaveExporting = appStore(state => state.setIsSaveExporting);
+  const setPostUploadEndpointUrl = appStore(
+    state => state.setPostUploadEndpointUrl,
+  );
+  const setPostExportConfig = appStore(state => state.setPostExportConfig);
+  const setIsPostExporting = appStore(state => state.setIsPostExporting);
   const setIsModalOpen = appStore(state => state.setIsModalOpen);
   const tagMode = appStore(state => state.tagMode);
   const storeDpr = appStore(state => state.dpr);
@@ -112,8 +140,9 @@ const App = (): React.JSX.Element => {
       setAppColors,
       setSafeInsets,
       setDpr,
+      setPostUploadEndpointUrl,
     }),
-    [setMediaFiles, setPost, setDpr],
+    [setMediaFiles, setPost, setDpr, setPostUploadEndpointUrl],
   );
 
   // Primary hydration: RN injects __EXPO_MEDIA__ + mediaReady before WEB_READY (develop flow).
@@ -157,6 +186,45 @@ const App = (): React.JSX.Element => {
     };
   }, [hydrationHandlers, applyLogConfigFromHydration]);
 
+  // Browser dev: mock RN inject so UI is not stuck on loader (no __EXPO_MEDIA__ in Vite).
+  // useEffect(() => {
+  //   if (!ENABLE_DEV_MOCK_HYDRATION || window.ReactNativeWebView) {
+  //     return;
+  //   }
+  //   const injected = (window as Window & {__EXPO_MEDIA__?: HydrationPayload})
+  //     .__EXPO_MEDIA__;
+  //   if (injected?.file?.length) {
+  //     return;
+  //   }
+
+  //   const mockPayload: HydrationPayload = {
+  //     file: [
+  //       {
+  //         id: 'dev-mock-video',
+  //         filename: 'ufc.mp4',
+  //         uri: VideoSRC2,
+  //         mediaType: 'video',
+  //         width: 1920,
+  //         height: 1080,
+  //         duration: 30,
+  //       },
+  //     ],
+  //     post: true,
+  //     dpr: window.devicePixelRatio || 2,
+  //     appColors: {
+  //       backgroundColorMain: 'rgba(227, 228, 231, 1)',
+  //       bottomMenuBackground: 'rgba(253, 253, 255, 1)',
+  //       textColor: 'rgba(0, 0, 0, 1)',
+  //       buttonColor: 'rgba(217, 217, 217, 1)',
+  //     },
+  //     insets: {top: 0, bottom: 0, left: 0, right: 0},
+  //     production: false,
+  //   };
+
+  //   rnLogger.log('🧪 Dev mock hydration (VideoSRC2)');
+  //   void applyHydrationFromPayload(mockPayload, 'DevMock', hydrationHandlers);
+  // }, [hydrationHandlers]);
+
   useEffect(() => {
     // Handle messages from RN
     const handleDocumentMessage = (event: MessageEvent) => {
@@ -194,6 +262,34 @@ const App = (): React.JSX.Element => {
           case 'SAVE_EXPORT_COMPLETE': {
             rnLogger.log('✅ Save export complete from RN');
             setIsSaveExporting(false);
+            break;
+          }
+
+          case 'START_POST_EXPORT': {
+            if (!isStartPostExportPayload(msg.payload)) {
+              rnLogger.warn('START_POST_EXPORT: invalid payload', msg.payload);
+              postPostExportFailed({
+                error: 'START_POST_EXPORT: invalid payload',
+              });
+              setIsPostExporting(false);
+              break;
+            }
+            const {fileCount, items} = msg.payload;
+            rnLogger.log('📥 START_POST_EXPORT received', {
+              fileCount,
+              items,
+            });
+            setPostExportConfig(fileCount, items);
+            setIsPostExporting(true);
+            postPostExportAck({fileCount});
+            void runPostExportBatch().catch(batchErr => {
+              rnLogger.componentLog(
+                'App',
+                'error',
+                `runPostExportBatch failed: ${batchErr}`,
+                batchErr,
+              );
+            });
             break;
           }
 
@@ -290,13 +386,8 @@ const App = (): React.JSX.Element => {
     return () => {
       document.removeEventListener('message', handleDocumentMessage as any);
     };
-  }, [
-    hydrationHandlers,
-    handleLogConfigMessage,
-    applyLogConfigFromHydration,
-    setIsModalOpen,
-    setIsSaveExporting,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrationHandlers, handleLogConfigMessage, applyLogConfigFromHydration]);
 
   useEffect(() => {
     rnLogger.log('🎨 Active filter changed:', activeFilter);
@@ -347,11 +438,7 @@ const App = (): React.JSX.Element => {
       <div
         className="flex h-screen w-screen items-center justify-center"
         style={{backgroundColor: appColors.backgroundColorMain}}>
-        <ClipLoader
-          size={40}
-          color="#FF4800"
-          cssOverride={{borderWidth: '3.5px'}}
-        />
+        <Loader size={40} color="#FF4800" borderWidth={3.5} />
       </div>
     );
   }
@@ -361,9 +448,9 @@ const App = (): React.JSX.Element => {
       className={`flex h-screen w-screen items-center justify-center`}
       style={{backgroundColor: appColors.backgroundColorMain}}>
       <div
-        className={`relative mx-auto flex h-full max-w-full flex-1 flex-col`}>
+        className={`relative mx-auto flex h-full max-w-full flex-1 flex-col overflow-hidden`}>
         <MediaComponent post={post} />
-        {!buttonsOpen && (
+        {(activeButton === 'mainMenu' || activeButton === null) && (
           <BottomBar
             post={post}
             appColors={appColors}
@@ -382,8 +469,23 @@ const App = (): React.JSX.Element => {
         {buttonsOpen && activeButton === 'editor' && (
           <EditorMenu appColors={appColors} safeInsets={safeInsets} />
         )}
-        {buttonsOpen && activeButton === 'text' && (
-          <TextMenu appColors={appColors} safeInsets={safeInsets} />
+        {buttonsOpen &&
+          activeButton !== null &&
+          (activeButton === 'text' ||
+            activeButton === 'textColor' ||
+            activeButton === 'textBackgroundColor') && (
+            <TextMenu appColors={appColors} safeInsets={safeInsets} />
+          )}
+        {buttonsOpen &&
+          activeButton !== null &&
+          TEXT_FLOW_BUTTONS.has(activeButton) && (
+            <TextContentOverlayArea post={post} safeInsets={safeInsets} />
+          )}
+        {buttonsOpen && activeButton === 'fontStyle' && (
+          <FontStyleMenu appColors={appColors} safeInsets={safeInsets} />
+        )}
+        {buttonsOpen && activeButton === 'textBackground' && (
+          <TextBackgroundMenu appColors={appColors} safeInsets={safeInsets} />
         )}
         {buttonsOpen && activeButton === 'editorMainMenu' && (
           <EditorMenuMain appColors={appColors} safeInsets={safeInsets} />

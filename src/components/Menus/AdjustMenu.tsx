@@ -1,13 +1,13 @@
 // src/components/Menus/AdjustMenu.tsx
 import React, {useEffect, useState, useRef, useMemo} from 'react';
+import {LazySketchColorPicker} from '@/components/shared/LazySketchColorPicker';
+import {useThrottledHexCommit} from '@/hooks/useThrottledHexCommit';
 import {appStore} from '../../store/appStore';
 import {faXmark} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
-import {getVideoThumbnail} from '../../helpers/filter_helper';
-import {ClipLoader} from 'react-spinners';
 import {useGesture} from '@use-gesture/react';
-import {useElementSize} from '../../hooks/useElementSize';
-import Sketch from '@uiw/react-color-sketch';
+import {useAdjustPreviewLayout} from '../../hooks/useAdjustPreviewLayout';
+import {AdjustPreviewFrame} from './shared/AdjustPreviewFrame';
 import {
   defaultAdjustTransform,
   type AdjustRecord,
@@ -27,8 +27,6 @@ export const AdjustMenu = ({
   const setActiveButton = appStore(state => state.setActiveButton);
   const mediaFiles = appStore(state => state.mediaFiles);
   const activeIndex = appStore(state => state.activeIndex);
-  const thumbCache = appStore(state => state.thumbCache);
-  const setThumbCache = appStore(state => state.setThumbCache);
   const tagMode = appStore(state => state.tagMode);
   const setTagMode = appStore(state => state.setTagMode);
   const addTagToIndex = appStore(state => state.addTagToIndex);
@@ -46,53 +44,17 @@ export const AdjustMenu = ({
     defaultAdjustTransform.bgColor,
   );
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [videoThumbnail, setVideoThumbnail] = useState<string | undefined>();
-  const [isLoadingThumb, setIsLoadingThumb] = useState(false);
-  const [baseFitScale, setBaseFitScale] = useState(1);
   const [isTagSelectionLocked, setIsTagSelectionLocked] = useState(false);
 
   const activeFile = mediaFiles[activeIndex];
-  const imgRef = useRef<HTMLImageElement>(null);
-  const {ref: previewRef, size: previewSize} = useElementSize<HTMLDivElement>();
+  const mediaRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
   const tagSelectionTimeoutRef = useRef<any | null>(null);
 
   const [position, setPosition] = useState({x: 0, y: 0});
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
 
-  const displayScale = useMemo(() => {
-    if (!activeFile || !previewSize?.width || !previewSize?.height) {
-      return {x: 1, y: 1};
-    }
-
-    const mediaAspect = activeFile.width / activeFile.height;
-    const previewAspect = previewSize.width / previewSize.height;
-
-    let displayedWidth: number, displayedHeight: number;
-
-    if (post) {
-      if (mediaAspect > previewAspect) {
-        displayedHeight = previewSize.height;
-        displayedWidth = displayedHeight * mediaAspect;
-      } else {
-        displayedWidth = previewSize.width;
-        displayedHeight = displayedWidth / mediaAspect;
-      }
-    } else {
-      if (mediaAspect > previewAspect) {
-        displayedWidth = previewSize.width;
-        displayedHeight = displayedWidth / mediaAspect;
-      } else {
-        displayedHeight = previewSize.height;
-        displayedWidth = displayedHeight * mediaAspect;
-      }
-    }
-
-    return {
-      x: activeFile.width / displayedWidth,
-      y: activeFile.height / displayedHeight,
-    };
-  }, [activeFile, previewSize, post]);
+  const {displayScale, previewRef} = useAdjustPreviewLayout(post, activeIndex);
 
   useEffect(() => {
     if (
@@ -111,62 +73,24 @@ export const AdjustMenu = ({
     }
   }, [activeIndex, currentStoreAdjust, activeFile]);
 
-  useEffect(() => {
-    if (!activeFile || !previewSize?.width || !previewSize?.height) return;
-
-    const mediaAspect = activeFile.width / activeFile.height;
-    const previewAspect = previewSize.width / previewSize.height;
-
-    let scale;
-    if (post) {
-      scale =
-        mediaAspect > previewAspect
-          ? previewSize.height / activeFile.height
-          : previewSize.width / activeFile.width;
-    } else {
-      scale =
-        mediaAspect > previewAspect
-          ? previewSize.width / activeFile.width
-          : previewSize.height / activeFile.height;
-    }
-
-    setBaseFitScale(scale);
-  }, [activeFile, previewSize, post]);
-
-  useEffect(() => {
-    if (!activeFile || activeFile.mediaType !== 'video') {
-      setVideoThumbnail(undefined);
-      return;
-    }
-    let mounted = true;
-    void (async () => {
-      setIsLoadingThumb(true);
-      try {
-        const thumb = await getVideoThumbnail(
-          activeFile.uri,
-          activeIndex,
-          0.5,
-          1080,
-          thumbCache,
-          setThumbCache,
-        );
-        if (mounted) setVideoThumbnail(thumb);
-      } catch (err) {
-        rnLogger.componentLog(
-          'AdjustMenu',
-          'error',
-          `Failed to get video thumbnail, ${err}`,
-        );
-      } finally {
-        if (mounted) setIsLoadingThumb(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [activeFile, activeIndex, thumbCache, setThumbCache]);
-
   const isPhotoSlide = activeFile?.mediaType === 'photo';
+
+  const adjustPreviewTransform = useMemo(
+    () => ({
+      positionX: position.x,
+      positionY: position.y,
+      scale,
+      rotation,
+      bgColor: localBgColor,
+    }),
+    [position.x, position.y, scale, rotation, localBgColor],
+  );
+  const {
+    onChange: handleAdjustBgColorChange,
+    flushPending: flushAdjustBgColor,
+  } = useThrottledHexCommit((hex: string) => {
+    setLocalBgColor(hex);
+  });
 
   useEffect(() => {
     if (activeFile?.mediaType === 'video' && tagMode) {
@@ -310,7 +234,7 @@ export const AdjustMenu = ({
           : undefined,
     },
     {
-      target: imgRef,
+      target: mediaRef,
       drag: {
         from: () => [position.x / displayScale.x, position.y / displayScale.y],
         filterTaps: true,
@@ -328,7 +252,7 @@ export const AdjustMenu = ({
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (tagMode) {
-      setActiveButton(null);
+      setActiveButton('mainMenu');
       setTagMode(false);
       return;
     }
@@ -385,7 +309,6 @@ export const AdjustMenu = ({
     }
   };
 
-  const aspect = `${post ? 'aspect-4/5' : 'aspect-9/16'}`;
   const closeTop = `${post ? 'top-8 left-7' : 'left-7 top-8'}`;
 
   return (
@@ -401,60 +324,11 @@ export const AdjustMenu = ({
         <FontAwesomeIcon icon={faXmark} size="lg" color="white" />
       </button>
 
-      <div
-        ref={previewRef}
-        className={`relative flex w-full items-center justify-center overflow-hidden rounded-lg border ${aspect}`}
-        style={{backgroundColor: localBgColor}}>
-        {activeFile ? (
-          activeFile.mediaType === 'video' ? (
-            isLoadingThumb ? (
-              <ClipLoader size={30} color="#FF4800" />
-            ) : (
-              videoThumbnail && (
-                <img
-                  ref={imgRef}
-                  src={videoThumbnail}
-                  alt="video thumbnail"
-                  className="touch-none select-none"
-                  style={{
-                    maxWidth: 'none',
-                    maxHeight: 'none',
-                    transform: `
-                    translate(${position.x / displayScale.x}px, ${position.y / displayScale.y}px)
-                    scale(${baseFitScale * scale})
-                    rotate(${rotation}deg)
-                    `,
-                    transformOrigin: 'center center',
-                    touchAction: 'none',
-                  }}
-                  draggable={false}
-                />
-              )
-            )
-          ) : (
-            <img
-              ref={imgRef}
-              src={activeFile.uri}
-              alt="image preview"
-              className="touch-none select-none"
-              style={{
-                maxWidth: 'none',
-                maxHeight: 'none',
-                transform: `
-                translate(${position.x / displayScale.x}px, ${position.y / displayScale.y}px)
-                scale(${baseFitScale * scale})
-                rotate(${rotation}deg)
-                `,
-                transformOrigin: 'center center',
-                touchAction: 'none',
-              }}
-              draggable={false}
-            />
-          )
-        ) : (
-          <p className="text-white">No media</p>
-        )}
-
+      <AdjustPreviewFrame
+        post={post}
+        activeIndex={activeIndex}
+        transform={adjustPreviewTransform}
+        mediaRef={mediaRef}>
         {/* Position tags — images only (not video adjust preview) */}
         {isPhotoSlide &&
           tagValuesByIndex[activeIndex].tags?.map(tag => (
@@ -483,7 +357,7 @@ export const AdjustMenu = ({
               </button>
             </div>
           ))}
-      </div>
+      </AdjustPreviewFrame>
 
       {!tagMode && (
         <>
@@ -514,11 +388,17 @@ export const AdjustMenu = ({
         <div
           onClick={e => e.stopPropagation()}
           className="absolute bottom-20 left-1/2 z-1000 -translate-x-1/2 rounded-lg bg-white p-2 shadow-lg">
-          <Sketch
-            color={localBgColor}
-            width={300}
-            onChange={(color: any) => setLocalBgColor(color.hex)}
-          />
+          <div
+            onPointerUpCapture={() => flushAdjustBgColor()}
+            onPointerCancel={() => flushAdjustBgColor()}>
+            <LazySketchColorPicker
+              color={localBgColor}
+              width={300}
+              onChange={(color: {hex: string}) =>
+                handleAdjustBgColorChange(color)
+              }
+            />
+          </div>
         </div>
       )}
     </div>

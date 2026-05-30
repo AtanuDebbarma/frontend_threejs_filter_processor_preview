@@ -1,8 +1,14 @@
 import type {StateCreator} from 'zustand';
 import type {AppState} from './appStore';
 import type {MediaFile} from '../types/filterTypes';
+import type {PostExportItem} from '../helpers/exportTypes';
 import {defaultEditor} from './editorSlice';
 import {defaultAdjustTransform} from './adjustSlice';
+
+export type VideoPlaybackTimeEntry = {
+  id: string;
+  currentTime: number;
+};
 
 export type FileSliceType = {
   mediaFiles: MediaFile[];
@@ -10,6 +16,13 @@ export type FileSliceType = {
   setMediaFiles: (files: MediaFile[]) => void;
   thumbCache: Map<number, string>;
   setThumbCache: (index: number, uri: string) => void;
+  /** Last known playback position (seconds) per slide index — videos only. */
+  videoPlaybackTimeByIndex: Record<number, VideoPlaybackTimeEntry>;
+  setVideoPlaybackTime: (
+    index: number,
+    mediaId: string,
+    currentTime: number,
+  ) => void;
   setActiveIndex: (index: number) => void;
   resetCache: () => void;
   videoMutedState: Record<number, {id: string; muted: boolean}>;
@@ -18,6 +31,14 @@ export type FileSliceType = {
   setDpr: (dpr: number) => void;
   isSaveExporting: boolean;
   setIsSaveExporting: (exporting: boolean) => void;
+  postUploadEndpointUrl: string | null;
+  setPostUploadEndpointUrl: (url: string | null) => void;
+  isPostExporting: boolean;
+  setIsPostExporting: (exporting: boolean) => void;
+  postExportFileCount: number;
+  postExportItems: PostExportItem[];
+  setPostExportConfig: (fileCount: number, items: PostExportItem[]) => void;
+  resetPostExport: () => void;
 };
 
 export const createFileSlice: StateCreator<
@@ -29,6 +50,7 @@ export const createFileSlice: StateCreator<
   mediaFiles: [],
   activeIndex: 0,
   thumbCache: new Map(),
+  videoPlaybackTimeByIndex: {},
   videoMutedState: {},
   dpr: null,
   setDpr: (dpr: number) =>
@@ -39,6 +61,29 @@ export const createFileSlice: StateCreator<
   setIsSaveExporting: exporting =>
     set(state => {
       state.isSaveExporting = exporting;
+    }),
+  postUploadEndpointUrl: null,
+  setPostUploadEndpointUrl: url =>
+    set(state => {
+      state.postUploadEndpointUrl = url;
+    }),
+  isPostExporting: false,
+  setIsPostExporting: exporting =>
+    set(state => {
+      state.isPostExporting = exporting;
+    }),
+  postExportFileCount: 0,
+  postExportItems: [],
+  setPostExportConfig: (fileCount, items) =>
+    set(state => {
+      state.postExportFileCount = fileCount;
+      state.postExportItems = items;
+    }),
+  resetPostExport: () =>
+    set(state => {
+      state.isPostExporting = false;
+      state.postExportFileCount = 0;
+      state.postExportItems = [];
     }),
 
   /**
@@ -59,16 +104,33 @@ export const createFileSlice: StateCreator<
           value: {...defaultAdjustTransform},
         };
         state.tagValuesByIndex[index] = {id: file.id, tags: []};
+        state.textEditorByIndex[index] = {
+          id: file.id,
+          layers: [],
+          activeLayerId: null,
+          focusedTextLayerId: null,
+        };
       });
 
-      // ✅ Initialize videoMutedState for all video files
       const newMutedState: Record<number, {id: string; muted: boolean}> = {};
+      const newPlaybackTimes: Record<number, VideoPlaybackTimeEntry> = {};
       files.forEach((file, index) => {
         if (file.mediaType === 'video') {
           newMutedState[index] = {id: file.id, muted: false};
+          newPlaybackTimes[index] = {id: file.id, currentTime: 0};
         }
       });
       state.videoMutedState = newMutedState;
+      state.videoPlaybackTimeByIndex = newPlaybackTimes;
+    }),
+
+  setVideoPlaybackTime: (index, mediaId, currentTime) =>
+    set(state => {
+      if (!Number.isFinite(currentTime) || currentTime < 0) return;
+      state.videoPlaybackTimeByIndex[index] = {
+        id: mediaId,
+        currentTime,
+      };
     }),
 
   setActiveIndex: (index: number) =>
@@ -82,7 +144,7 @@ export const createFileSlice: StateCreator<
     set({thumbCache: cache});
   },
   resetCache: () => {
-    set({thumbCache: new Map()});
+    set({thumbCache: new Map(), videoPlaybackTimeByIndex: {}});
   },
   setVideoMutedState: (index, id, muted) =>
     set(state => {
