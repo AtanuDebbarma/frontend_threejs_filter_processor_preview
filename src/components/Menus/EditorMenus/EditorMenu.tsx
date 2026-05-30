@@ -3,18 +3,18 @@ import React, {useState} from 'react';
 import {
   EditableFilters,
   type EditorFilter,
-} from '../../assets/filters/editorData';
-import {appStore} from '../../store/appStore';
+} from '../../../assets/filters/editorData';
+import {appStore} from '../../../store/appStore';
 import {
   getEditorSliderBinding,
   getColorBalanceBinding,
   inlineStyle,
-} from '../../helpers/editor_helpers';
-import type {ColorBalance} from '../../types/filterTypes';
+} from '../../../helpers/editor_helpers';
+import type {ColorBalance} from '../../../types/filterTypes';
 import {faArrowLeft} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
-import {defaultEditor, type EditorRecord} from '../../store/editorSlice';
-import type {AppColors, Insets} from '../../App';
+import {defaultEditor, type EditorRecord} from '../../../store/editorSlice';
+import type {AppColors, Insets} from '../../../App';
 
 type Views = 'Editor' | EditorFilter['name'];
 

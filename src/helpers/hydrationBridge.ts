@@ -21,6 +21,7 @@ export type ApplyHydrationOptions = {
   setAppColors: Dispatch<SetStateAction<AppColors>>;
   setSafeInsets: Dispatch<SetStateAction<Insets>>;
   setDpr: (dpr: number) => void;
+  setPostUploadEndpointUrl?: (url: string | null) => void;
 };
 
 export const applyHydrationFromPayload = async (
@@ -55,5 +56,9 @@ export const applyHydrationFromPayload = async (
   }
   if (data.dpr != null) {
     options.setDpr(data.dpr);
+  }
+  if (data.uploadEndpoint && options.setPostUploadEndpointUrl) {
+    options.setPostUploadEndpointUrl(data.uploadEndpoint);
+    rnLogger.log('📥 Post upload endpoint set from hydration');
   }
 };

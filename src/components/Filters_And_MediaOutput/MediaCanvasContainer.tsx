@@ -9,7 +9,7 @@ import {
   faVolumeHigh,
   faCircleUser,
 } from '@fortawesome/free-solid-svg-icons';
-import {ClipLoader} from 'react-spinners';
+import {Loader} from '@/components/shared/Loader';
 import {useActiveMediaIndex} from '../../hooks/useActiveMediaIndex';
 import {
   useVerifiedMediaFiles,
@@ -384,11 +384,11 @@ export const MediaCanvasContainer = ({
   if (!initialized || !mediaList.length) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <ClipLoader
+        <Loader
           size={40}
           color="#FF4800"
+          borderWidth={3.5}
           className="z-1000"
-          cssOverride={{borderWidth: '3.5px'}}
         />
       </div>
     );
@@ -441,11 +441,11 @@ export const MediaCanvasContainer = ({
 
             {isApplyingFilter && (
               <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
-                <ClipLoader
+                <Loader
                   size={40}
                   color="#FF4800"
+                  borderWidth={3.5}
                   className="z-1000"
-                  cssOverride={{borderWidth: '3.5px'}}
                 />
               </div>
             )}
@@ -470,11 +470,11 @@ export const MediaCanvasContainer = ({
 
             {isApplyingFilter && (
               <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
-                <ClipLoader
+                <Loader
                   size={40}
                   color="#FF4800"
+                  borderWidth={3.5}
                   className="z-1000"
-                  cssOverride={{borderWidth: '3.5px'}}
                 />
               </div>
             )}
@@ -549,11 +549,11 @@ export const MediaCanvasContainer = ({
 
                 {isApplyingFilter && (
                   <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
-                    <ClipLoader
+                    <Loader
                       size={40}
                       color="#FF4800"
+                      borderWidth={3.5}
                       className="z-1000"
-                      cssOverride={{borderWidth: '3.5px'}}
                     />
                   </div>
                 )}
@@ -580,11 +580,11 @@ export const MediaCanvasContainer = ({
                 <RenderTagIcon mediaIndex={index} />
                 {isApplyingFilter && (
                   <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
-                    <ClipLoader
+                    <Loader
                       size={40}
                       color="#FF4800"
+                      borderWidth={3.5}
                       className="z-1000"
-                      cssOverride={{borderWidth: '3.5px'}}
                     />
                   </div>
                 )}

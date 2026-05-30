@@ -44,10 +44,15 @@ export const resolveExportDimensions = (
 
 export type ExportProgressStage = 'encoding' | 'writing';
 
+/** Post export progress (Save uses `encoding` | `writing` only). */
+export type PostExportProgressStage = 'encoding' | 'uploading';
+
 export type ExportProgressPayload = {
   id: string;
   percent: number;
-  stage: ExportProgressStage;
+  stage: ExportProgressStage | PostExportProgressStage;
+  fileIndex?: number;
+  fileCount?: number;
 };
 
 /** Photos: single base64 message when under size cap. Videos: chunked mux (Phase E). */
@@ -108,4 +113,39 @@ export type SaveExportFailedMessage = {
   error: string;
   technicalError?: string;
   mediaType?: 'photo' | 'video';
+};
+
+export type PostExportItem = {
+  id: string;
+  index: number;
+  mediaType: 'photo' | 'video';
+};
+
+export type StartPostExportPayload = {
+  mode: 'post';
+  destination: 's3';
+  fileCount: number;
+  items: PostExportItem[];
+};
+
+export type ExportSuccessPayload = {
+  id: string;
+  index: number;
+  s3Url: string;
+  mediaType: 'photo' | 'video';
+  fileIndex?: number;
+  fileCount?: number;
+};
+
+export type PostExportFailedPayload = {
+  id?: string;
+  error: string;
+  technicalError?: string;
+  mediaType?: 'photo' | 'video';
+  fileIndex?: number;
+  fileCount?: number;
+};
+
+export type PostExportAckPayload = {
+  fileCount: number;
 };

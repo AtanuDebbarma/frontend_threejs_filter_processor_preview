@@ -2,12 +2,33 @@
 import {fnLog} from '../utils/rnLogger';
 
 /** URIs the <video> element can load without fetch (RN hydration uses file:// for videos). */
-const isDirectVideoSrc = (uri: string): boolean =>
+export const isDirectVideoSrc = (uri: string): boolean =>
   uri.startsWith('blob:') ||
   uri.startsWith('data:') ||
   uri.startsWith('file:') ||
   uri.startsWith('content:') ||
   uri.startsWith('ph:');
+
+export type ResolvedVideoSrc = {
+  src: string;
+  revoke?: () => void;
+};
+
+/** Resolve a URI the <video> element can load (fetch → blob URL when needed). */
+export const resolveVideoElementSrc = async (
+  uri: string,
+): Promise<ResolvedVideoSrc> => {
+  if (isDirectVideoSrc(uri)) {
+    return {src: uri};
+  }
+  const res = await fetch(uri);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch video: ${res.status}`);
+  }
+  const blob = await res.blob();
+  const src = URL.createObjectURL(blob);
+  return {src, revoke: () => URL.revokeObjectURL(src)};
+};
 
 /**
  * Get (or return cached) video thumbnail for a given media index.
@@ -38,21 +59,9 @@ export const getVideoThumbnail = async (
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas context unavailable');
 
-  let sourceUri = uri;
-  let createdObjectUrl: string | null = null;
+  const {src: sourceUri, revoke} = await resolveVideoElementSrc(uri);
 
   try {
-    // http(s) / localhost only — fetch → blob URL. file:// must not use fetch (fails in WebView).
-    if (!isDirectVideoSrc(uri)) {
-      const res = await fetch(uri);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch video: ${res.status}`);
-      }
-      const blob = await res.blob();
-      sourceUri = URL.createObjectURL(blob);
-      createdObjectUrl = sourceUri;
-    }
-
     video.src = sourceUri;
     video.preload = 'metadata';
     video.muted = true;
@@ -96,7 +105,7 @@ export const getVideoThumbnail = async (
     fnLog('getVideoThumbnail', 'error', `Failed: ${err}`, err);
     throw err;
   } finally {
-    if (createdObjectUrl) URL.revokeObjectURL(createdObjectUrl);
+    revoke?.();
     video.src = '';
   }
 };

@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {appStore} from '../../store/appStore';
 import {getVideoThumbnail} from '../../helpers/filter_helper';
-import {ClipLoader} from 'react-spinners';
+import {Loader} from '@/components/shared/Loader';
 import {FILTERS, CATEGORY_GRADIENTS} from '../../assets/filters/filterData';
 import type {FilterItem} from '../../types/filterTypes';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
@@ -33,7 +33,6 @@ export const FilterMenu = ({
   const activeIndex = appStore(state => state.activeIndex);
   const isApplyingFilter = appStore(state => state.isApplyingFilter);
   const setActiveFilter = appStore(state => state.setActiveFilter);
-  const thumbCache = appStore(state => state.thumbCache);
   const setThumbCache = appStore(state => state.setThumbCache);
   const resetEditorState = appStore(state => state.resetEditorState);
   const setActiveButton = appStore(state => state.setActiveButton);
@@ -60,31 +59,55 @@ export const FilterMenu = ({
       return;
     }
 
-    const loadThumbnail = async () => {
-      setIsLoadingThumbnail(true);
+    const cached = appStore.getState().thumbCache.get(activeIndex);
+    if (cached) {
+      setVideoThumbnail(cached);
+      setIsLoadingThumbnail(false);
+      return;
+    }
+
+    let mounted = true;
+    setIsLoadingThumbnail(true);
+    void (async () => {
       try {
         const thumbnail = await getVideoThumbnail(
           activeFile.uri,
           activeIndex,
           0.5,
           1080,
-          thumbCache,
+          appStore.getState().thumbCache,
           setThumbCache,
         );
-        setVideoThumbnail(thumbnail);
+        if (mounted) {
+          setVideoThumbnail(thumbnail);
+        }
       } catch (err) {
         rnLogger.componentLog(
           'FilterMenu',
           'error',
           `Thumbnail generation failed: ${err}`,
         );
+        if (mounted) {
+          setVideoThumbnail(undefined);
+        }
       } finally {
-        setIsLoadingThumbnail(false);
+        if (mounted) {
+          setIsLoadingThumbnail(false);
+        }
       }
-    };
+    })();
 
-    void loadThumbnail();
-  }, [activeFile, thumbCache, setThumbCache, activeIndex]);
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeFile?.id,
+    activeFile?.uri,
+    activeFile?.mediaType,
+    activeIndex,
+    setThumbCache,
+  ]);
 
   const onSelectLut = async (filter: FilterItem | null) => {
     if (applying || isApplyingFilter) return;
@@ -123,7 +146,7 @@ export const FilterMenu = ({
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setTimeout(() => {
-      setActiveButton(null);
+      setActiveButton('mainMenu');
     }, 200);
   };
 
@@ -169,11 +192,7 @@ export const FilterMenu = ({
                     {fileType === 'video' ? (
                       isLoadingThumbnail || isApplyingFilter ? (
                         <div className="flex h-full w-full items-center justify-center">
-                          <ClipLoader
-                            size={10}
-                            color="#FF4800"
-                            className="z-10"
-                          />
+                          <Loader size={10} color="#FF4800" className="z-10" />
                         </div>
                       ) : (
                         <>
