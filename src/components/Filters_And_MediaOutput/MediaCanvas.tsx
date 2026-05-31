@@ -84,12 +84,7 @@ export const MediaCanvas = ({
         id={`canvas-${aspectType}-${index}`}
         style={{width: '100%', height: '100%', zIndex: 100}}
         camera={{position: [0, 0, 5], fov: 50}}
-        gl={{
-          antialias: true,
-          alpha: true,
-          preserveDrawingBuffer: true,
-          powerPreference: 'high-performance',
-        }}
+        gl={{antialias: true, alpha: true, preserveDrawingBuffer: true}}
         onCreated={state => {
           setExportCanvas(index, state.gl.domElement);
           setExportRenderer(index, {invalidate: state.invalidate});
