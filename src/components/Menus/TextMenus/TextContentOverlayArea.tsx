@@ -12,14 +12,16 @@ import {isPointerOnTrashButton} from '@/helpers/textTrashDropHitTest';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {StoryTextPill, type StoryTextPillHandle} from './StoryTextPill';
 import {TextLayerGestureSurface} from './TextLayerGestureSurface';
+import type {ExportMode} from '@/helpers/exportTypes';
+import {isPostLayoutMode} from '@/helpers/exportTypes';
 
 type Props = {
-  post: boolean;
+  exportMode: ExportMode;
   safeInsets: Insets;
 };
 
 export const TextContentOverlayArea = ({
-  post = true,
+  exportMode,
   safeInsets,
 }: Props): React.JSX.Element => {
   const setActiveButton = appStore(state => state.setActiveButton);
@@ -90,7 +92,9 @@ export const TextContentOverlayArea = ({
   const [draggingLayerId, setDraggingLayerId] = useState<string | null>(null);
   const [isPointerOverTrash, setIsPointerOverTrash] = useState(false);
 
-  const closeTop = post ? 'top-8 left-7' : 'left-7 top-8';
+  const closeTop = isPostLayoutMode(exportMode)
+    ? 'top-8 left-7'
+    : 'left-7 top-8';
 
   const dismissEmptyTextLayers = useCallback(() => {
     if (!attachmentId) return;
@@ -254,7 +258,7 @@ export const TextContentOverlayArea = ({
             className="relative w-full max-w-full min-w-0"
             onPointerDown={handlePreviewPointerDown}>
             <AdjustPreviewFrame
-              post={post}
+              exportMode={exportMode}
               activeIndex={activeIndex}
               transform={previewTransform}
               fromText={true}

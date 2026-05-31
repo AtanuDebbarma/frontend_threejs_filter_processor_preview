@@ -1,4 +1,7 @@
+import type {ExportMode} from '../helpers/exportTypes';
 import type {MediaFile} from './filterTypes';
+
+export type {ExportMode} from '../helpers/exportTypes';
 
 export type AppColors = {
   backgroundColorMain: string;
@@ -16,7 +19,7 @@ export type Insets = {
 
 export type HydrationPayload = {
   file: MediaFile[];
-  post: boolean;
+  exportMode: ExportMode;
   dpr: number;
   appColors: AppColors;
   insets: Insets;

@@ -5,8 +5,14 @@ import {useElementSize} from '../../hooks/useElementSize';
 import useWindowSize from '../../hooks/findWindowSize';
 import {faXmark, faPlus} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import type {ExportMode} from '@/helpers/exportTypes';
+import {isPostLayoutMode} from '@/helpers/exportTypes';
 
-const MediaComponent = ({post}: {post: boolean}): React.JSX.Element => {
+const MediaComponent = ({
+  exportMode,
+}: {
+  exportMode: ExportMode;
+}): React.JSX.Element => {
   const setActiveButton = appStore(state => state.setActiveButton);
   const mediaFiles = appStore(state => state.mediaFiles);
 
@@ -113,11 +119,11 @@ const MediaComponent = ({post}: {post: boolean}): React.JSX.Element => {
 
   return (
     <section onClick={e => handleClose(e)} className={sectionClassName}>
-      {!post ? (
+      {!isPostLayoutMode(exportMode) ? (
         <div className="flex h-full w-full items-center justify-center">
           <div className="relative aspect-9/16 max-h-full w-full max-w-full rounded-lg border-[0.5px] border-gray-500 bg-gray-950">
             <div className="flex h-full w-full min-w-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden scroll-smooth">
-              <MediaCanvasContainer post={post} />
+              <MediaCanvasContainer exportMode={exportMode} />
             </div>
           </div>
         </div>
@@ -135,7 +141,7 @@ const MediaComponent = ({post}: {post: boolean}): React.JSX.Element => {
             <div
               style={innerContainerStyle}
               className="flex min-w-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden scroll-smooth">
-              <MediaCanvasContainer post={post} />
+              <MediaCanvasContainer exportMode={exportMode} />
             </div>
           </div>
         </div>

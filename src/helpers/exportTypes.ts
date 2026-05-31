@@ -13,17 +13,26 @@ export const EXPORT_DIMENSIONS_FULL: Record<
 };
 
 /**
- * Lower resolution for Post batch when **multiple videos** (RAM / encode time).
- * Images always use EXPORT_DIMENSIONS_FULL.
+ * Lower resolution for multi-video batch (RAM / encode time).
+ * ~+23% pixels vs legacy 864-wide targets; images always use EXPORT_DIMENSIONS_FULL.
  */
 export const EXPORT_DIMENSIONS_BATCH: Record<
   ExportMode,
   {width: number; height: number}
 > = {
-  post: {width: 864, height: 1080},
-  reel: {width: 864, height: 1536},
-  story: {width: 864, height: 1536},
+  post: {width: 960, height: 1200},
+  reel: {width: 960, height: 1712},
+  story: {width: 960, height: 1712},
 };
+
+/** Cap R3F preview DPR — sharper than 1×, avoids 3× buffer cost on high-DPR phones. */
+export const MAX_PREVIEW_DEVICE_PIXEL_RATIO = 2;
+
+/** 4:5 carousel / post layout (vs 9:16 reel/story). */
+export const isPostLayoutMode = (mode: ExportMode): boolean => mode === 'post';
+
+export const isExportMode = (value: unknown): value is ExportMode =>
+  value === 'post' || value === 'reel' || value === 'story';
 
 /** @deprecated Use resolveExportDimensions — kept as alias for full post size. */
 export const TARGET_DIMENSIONS = EXPORT_DIMENSIONS_FULL;
@@ -41,6 +50,14 @@ export const resolveExportDimensions = (
     ? EXPORT_DIMENSIONS_BATCH[mode]
     : EXPORT_DIMENSIONS_FULL[mode];
 };
+
+/** Uses hydration `exportMode` for batch/full dimension tables. */
+export const resolveExportDimensionsForMode = (
+  exportMode: ExportMode,
+  mediaType: 'photo' | 'video',
+  videoCountInFiles: number,
+): {width: number; height: number} =>
+  resolveExportDimensions(exportMode, mediaType, videoCountInFiles);
 
 export type ExportProgressStage = 'encoding' | 'writing';
 

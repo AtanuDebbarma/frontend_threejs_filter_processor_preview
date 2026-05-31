@@ -1,10 +1,14 @@
+import {appStore} from '../store/appStore';
+import {rnLogger} from '../utils/rnLogger';
 import type {
+  ExportMode,
   ExportProgressPayload,
   ExportSuccessPayload,
   PostExportAckPayload,
   PostExportFailedPayload,
   StartPostExportPayload,
 } from './exportTypes';
+import {runPostExportBatch} from './postExportMedia';
 
 const postToRN = (type: string, payload: unknown) => {
   if (!window.ReactNativeWebView) {
@@ -33,6 +37,31 @@ export const postPostExportFailed = (
 
 export const postPostExportAck = (payload: PostExportAckPayload): void => {
   postToRN('POST_EXPORT_ACK', payload);
+};
+
+/** RN paused export (app background) — stop batch between files. */
+export const requestCancelPostExport = (): void => {
+  appStore.getState().setPostExportCancelRequested(true);
+};
+
+export const handleStartOrResumePostExport = (
+  payload: StartPostExportPayload,
+  exportMode: ExportMode,
+  source: 'START_POST_EXPORT' | 'RESUME_POST_EXPORT',
+): void => {
+  const {fileCount, items} = payload;
+  rnLogger.log(`📥 ${source} received`, {fileCount, items});
+  appStore.getState().setPostExportConfig(fileCount, items);
+  appStore.getState().setIsPostExporting(true);
+  postPostExportAck({fileCount});
+  void runPostExportBatch(exportMode).catch(batchErr => {
+    rnLogger.componentLog(
+      'postBridge',
+      'error',
+      `${source} runPostExportBatch failed: ${batchErr}`,
+      batchErr,
+    );
+  });
 };
 
 export const isStartPostExportPayload = (

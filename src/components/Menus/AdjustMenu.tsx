@@ -12,16 +12,17 @@ import {
   defaultAdjustTransform,
   type AdjustRecord,
 } from '../../store/adjustSlice';
-import type {Insets} from '../../App';
+import type {ExportMode, Insets} from '../../App';
 import {rnLogger} from '../../utils/rnLogger';
+import {isPostLayoutMode} from '@/helpers/exportTypes';
 
 type Props = {
-  post: boolean;
+  exportMode: ExportMode;
   safeInsets: Insets;
 };
 
 export const AdjustMenu = ({
-  post = true,
+  exportMode,
   safeInsets,
 }: Props): React.JSX.Element => {
   const setActiveButton = appStore(state => state.setActiveButton);
@@ -54,7 +55,10 @@ export const AdjustMenu = ({
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
 
-  const {displayScale, previewRef} = useAdjustPreviewLayout(post, activeIndex);
+  const {displayScale, previewRef} = useAdjustPreviewLayout(
+    exportMode,
+    activeIndex,
+  );
 
   useEffect(() => {
     if (
@@ -309,7 +313,7 @@ export const AdjustMenu = ({
     }
   };
 
-  const closeTop = `${post ? 'top-8 left-7' : 'left-7 top-8'}`;
+  const closeTop = `${isPostLayoutMode(exportMode) ? 'top-8 left-7' : 'left-7 top-8'}`;
 
   return (
     <div
@@ -325,7 +329,7 @@ export const AdjustMenu = ({
       </button>
 
       <AdjustPreviewFrame
-        post={post}
+        exportMode={exportMode}
         activeIndex={activeIndex}
         transform={adjustPreviewTransform}
         mediaRef={mediaRef}>

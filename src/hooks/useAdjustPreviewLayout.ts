@@ -1,9 +1,14 @@
 import {appStore} from '@/store/appStore';
 import {useElementSize} from '@/hooks/useElementSize';
+import type {ExportMode} from '@/helpers/exportTypes';
+import {isPostLayoutMode} from '@/helpers/exportTypes';
 import {useMemo} from 'react';
 
 /** Same fit math as AdjustMenu — maps media pixels to preview box CSS. */
-export const useAdjustPreviewLayout = (post: boolean, activeIndex: number) => {
+export const useAdjustPreviewLayout = (
+  exportMode: ExportMode,
+  activeIndex: number,
+) => {
   const activeFile = appStore(state => state.mediaFiles[activeIndex]);
   const {ref: previewRef, size: previewSize} = useElementSize<HTMLDivElement>();
 
@@ -18,7 +23,7 @@ export const useAdjustPreviewLayout = (post: boolean, activeIndex: number) => {
     let displayedWidth: number;
     let displayedHeight: number;
 
-    if (post) {
+    if (isPostLayoutMode(exportMode)) {
       if (mediaAspect > previewAspect) {
         displayedHeight = previewSize.height;
         displayedWidth = displayedHeight * mediaAspect;
@@ -38,7 +43,7 @@ export const useAdjustPreviewLayout = (post: boolean, activeIndex: number) => {
       x: activeFile.width / displayedWidth,
       y: activeFile.height / displayedHeight,
     };
-  }, [activeFile, previewSize, post]);
+  }, [activeFile, previewSize, exportMode]);
 
   const baseFitScale = useMemo(() => {
     if (!activeFile || !previewSize?.width || !previewSize?.height) {
@@ -48,7 +53,7 @@ export const useAdjustPreviewLayout = (post: boolean, activeIndex: number) => {
     const mediaAspect = activeFile.width / activeFile.height;
     const previewAspect = previewSize.width / previewSize.height;
 
-    if (post) {
+    if (isPostLayoutMode(exportMode)) {
       return mediaAspect > previewAspect
         ? previewSize.height / activeFile.height
         : previewSize.width / activeFile.width;
@@ -56,7 +61,7 @@ export const useAdjustPreviewLayout = (post: boolean, activeIndex: number) => {
     return mediaAspect > previewAspect
       ? previewSize.width / activeFile.width
       : previewSize.height / activeFile.height;
-  }, [activeFile, previewSize, post]);
+  }, [activeFile, previewSize, exportMode]);
 
   return {
     activeFile,

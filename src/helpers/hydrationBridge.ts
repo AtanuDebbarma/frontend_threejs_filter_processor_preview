@@ -1,3 +1,5 @@
+import type {ExportMode} from './exportTypes';
+import {isExportMode} from './exportTypes';
 import type {
   AppColors,
   HydrationPayload,
@@ -17,7 +19,7 @@ export const postMessageToRN = (type: string, payload: unknown = {}): void => {
 
 export type ApplyHydrationOptions = {
   setMediaFiles: (files: MediaFile[] | []) => void;
-  setPost: Dispatch<SetStateAction<boolean>>;
+  setExportMode: Dispatch<SetStateAction<ExportMode>>;
   setAppColors: Dispatch<SetStateAction<AppColors>>;
   setSafeInsets: Dispatch<SetStateAction<Insets>>;
   setDpr: (dpr: number) => void;
@@ -41,11 +43,20 @@ export const applyHydrationFromPayload = async (
   const logPayload = trimBase64({files: data.file});
   rnLogger.log(`📥 ${source} (${data.file.length} file(s)):`, logPayload);
 
+  const exportMode: ExportMode = isExportMode(data.exportMode)
+    ? data.exportMode
+    : 'post';
+  if (!isExportMode(data.exportMode)) {
+    rnLogger.warn(
+      `${source}: invalid exportMode "${String(data.exportMode)}", defaulting to post`,
+    );
+  }
+
   await applyHydrationData(
-    data,
+    {...data, exportMode},
     source,
     options.setMediaFiles,
-    options.setPost,
+    options.setExportMode,
   );
 
   if (data.appColors) {

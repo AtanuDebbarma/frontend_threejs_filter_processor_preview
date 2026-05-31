@@ -6,9 +6,11 @@ import {Loader} from '@/components/shared/Loader';
 import {faTrash} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import React, {useCallback, type RefObject} from 'react';
+import type {ExportMode} from '@/helpers/exportTypes';
+import {isPostLayoutMode} from '@/helpers/exportTypes';
 
 type Props = {
-  post: boolean;
+  exportMode: ExportMode;
   activeIndex: number;
   transform: AdjustPreviewMediaTransform;
   children?: React.ReactNode;
@@ -26,7 +28,7 @@ type Props = {
  * Videos: non-playable <video> seeked to stored playback time (see useMenuPreviewVideo).
  */
 export const AdjustPreviewFrame = ({
-  post,
+  exportMode,
   activeIndex,
   transform,
   children,
@@ -37,7 +39,7 @@ export const AdjustPreviewFrame = ({
   textTrashButtonRef,
 }: Props): React.JSX.Element => {
   const {activeFile, previewRef, displayScale, baseFitScale} =
-    useAdjustPreviewLayout(post, activeIndex);
+    useAdjustPreviewLayout(exportMode, activeIndex);
 
   const {
     isVideo,
@@ -83,7 +85,7 @@ export const AdjustPreviewFrame = ({
     touchAction: 'none',
   };
 
-  const aspect = post ? 'aspect-4/5' : 'aspect-9/16';
+  const aspect = isPostLayoutMode(exportMode) ? 'aspect-4/5' : 'aspect-9/16';
   const showVideoSpinner = isVideo && isLoading && !posterSrc && !isFrameReady;
 
   return (
