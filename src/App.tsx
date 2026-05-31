@@ -36,14 +36,16 @@ import {
   postSaveExportFailed,
 } from './helpers/saveBridge';
 import {
+  handleStartOrResumePostExport,
   isStartPostExportPayload,
-  postPostExportAck,
   postPostExportFailed,
+  requestCancelPostExport,
 } from './helpers/postBridge';
-import {runPostExportBatch} from './helpers/postExportMedia';
+import type {ExportMode} from './helpers/exportTypes';
 
 export type {
   AppColors,
+  ExportMode,
   HydrationPayload,
   Insets,
   PatchPayload,
@@ -80,13 +82,12 @@ const App = (): React.JSX.Element => {
   const setPostUploadEndpointUrl = appStore(
     state => state.setPostUploadEndpointUrl,
   );
-  const setPostExportConfig = appStore(state => state.setPostExportConfig);
   const setIsPostExporting = appStore(state => state.setIsPostExporting);
   const setIsModalOpen = appStore(state => state.setIsModalOpen);
   const tagMode = appStore(state => state.tagMode);
   const storeDpr = appStore(state => state.dpr);
   const setDpr = appStore(state => state.setDpr);
-  const [post, setPost] = React.useState(true);
+  const [exportMode, setExportMode] = React.useState<ExportMode>('post');
   const [isInitializing, setInitializing] = React.useState(true);
   const [appColors, setAppColors] = React.useState<AppColors>({
     backgroundColorMain: 'rgba(227, 228, 231, 1)',
@@ -136,13 +137,13 @@ const App = (): React.JSX.Element => {
   const hydrationHandlers = React.useMemo(
     () => ({
       setMediaFiles,
-      setPost,
+      setExportMode,
       setAppColors,
       setSafeInsets,
       setDpr,
       setPostUploadEndpointUrl,
     }),
-    [setMediaFiles, setPost, setDpr, setPostUploadEndpointUrl],
+    [setMediaFiles, setExportMode, setDpr, setPostUploadEndpointUrl],
   );
 
   // Primary hydration: RN injects __EXPO_MEDIA__ + mediaReady before WEB_READY (develop flow).
@@ -209,7 +210,7 @@ const App = (): React.JSX.Element => {
   //         duration: 30,
   //       },
   //     ],
-  //     post: true,
+  //     exportMode: 'post',
   //     dpr: window.devicePixelRatio || 2,
   //     appColors: {
   //       backgroundColorMain: 'rgba(227, 228, 231, 1)',
@@ -265,31 +266,27 @@ const App = (): React.JSX.Element => {
             break;
           }
 
-          case 'START_POST_EXPORT': {
+          case 'START_POST_EXPORT':
+          case 'RESUME_POST_EXPORT': {
             if (!isStartPostExportPayload(msg.payload)) {
-              rnLogger.warn('START_POST_EXPORT: invalid payload', msg.payload);
+              rnLogger.warn(`${msg.type}: invalid payload`, msg.payload);
               postPostExportFailed({
-                error: 'START_POST_EXPORT: invalid payload',
+                error: `${msg.type}: invalid payload`,
               });
               setIsPostExporting(false);
               break;
             }
-            const {fileCount, items} = msg.payload;
-            rnLogger.log('📥 START_POST_EXPORT received', {
-              fileCount,
-              items,
-            });
-            setPostExportConfig(fileCount, items);
-            setIsPostExporting(true);
-            postPostExportAck({fileCount});
-            void runPostExportBatch().catch(batchErr => {
-              rnLogger.componentLog(
-                'App',
-                'error',
-                `runPostExportBatch failed: ${batchErr}`,
-                batchErr,
-              );
-            });
+            handleStartOrResumePostExport(
+              msg.payload,
+              exportMode,
+              msg.type as 'START_POST_EXPORT' | 'RESUME_POST_EXPORT',
+            );
+            break;
+          }
+
+          case 'CANCEL_POST_EXPORT': {
+            rnLogger.log('📥 CANCEL_POST_EXPORT — pausing batch between files');
+            requestCancelPostExport();
             break;
           }
 
@@ -323,7 +320,7 @@ const App = (): React.JSX.Element => {
                 const result = await exportActiveSlideForGallery(
                   id,
                   index,
-                  'post',
+                  exportMode,
                   {writePath, chunkSizeBytes},
                 );
                 if (result.kind === 'base64') {
@@ -449,10 +446,10 @@ const App = (): React.JSX.Element => {
       style={{backgroundColor: appColors.backgroundColorMain}}>
       <div
         className={`relative mx-auto flex h-full max-w-full flex-1 flex-col overflow-hidden`}>
-        <MediaComponent post={post} />
+        <MediaComponent exportMode={exportMode} />
         {(activeButton === 'mainMenu' || activeButton === null) && (
           <BottomBar
-            post={post}
+            exportMode={exportMode}
             appColors={appColors}
             safeInsets={safeInsets}
           />
@@ -479,7 +476,10 @@ const App = (): React.JSX.Element => {
         {buttonsOpen &&
           activeButton !== null &&
           TEXT_FLOW_BUTTONS.has(activeButton) && (
-            <TextContentOverlayArea post={post} safeInsets={safeInsets} />
+            <TextContentOverlayArea
+              exportMode={exportMode}
+              safeInsets={safeInsets}
+            />
           )}
         {buttonsOpen && activeButton === 'fontStyle' && (
           <FontStyleMenu appColors={appColors} safeInsets={safeInsets} />
@@ -491,7 +491,7 @@ const App = (): React.JSX.Element => {
           <EditorMenuMain appColors={appColors} safeInsets={safeInsets} />
         )}
         {((buttonsOpen && activeButton === 'adjust') || tagMode) && (
-          <AdjustMenu post={post} safeInsets={safeInsets} />
+          <AdjustMenu exportMode={exportMode} safeInsets={safeInsets} />
         )}
       </div>
     </main>

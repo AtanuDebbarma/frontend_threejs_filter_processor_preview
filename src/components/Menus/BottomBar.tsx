@@ -7,15 +7,20 @@ import {
   faMusic,
   faPenToSquare,
 } from '@fortawesome/free-solid-svg-icons';
-import type {AppColors, Insets} from '../../App';
+import type {AppColors, ExportMode, Insets} from '../../App';
+import {isPostLayoutMode} from '@/helpers/exportTypes';
 
 type Props = {
-  post: boolean;
+  exportMode: ExportMode;
   appColors: AppColors;
   safeInsets: Insets;
 };
 
-const BottomBar = ({post, appColors, safeInsets}: Props): React.JSX.Element => {
+const BottomBar = ({
+  exportMode,
+  appColors,
+  safeInsets,
+}: Props): React.JSX.Element => {
   const setActiveButton = appStore(state => state.setActiveButton);
 
   const handleButtonToggle = (
@@ -46,7 +51,7 @@ const BottomBar = ({post, appColors, safeInsets}: Props): React.JSX.Element => {
         <FontAwesomeIcon icon={faFilter} size="lg" />
         <span className="text-xs">Filters</span>
       </button>
-      {!post && (
+      {!isPostLayoutMode(exportMode) && (
         <button
           onClick={e => handleButtonToggle('sticker', e)}
           className="mx-1.5 flex flex-1 flex-col items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-3 shadow-sm transition-opacity duration-180 active:opacity-50"

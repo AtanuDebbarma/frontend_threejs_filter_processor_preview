@@ -1,6 +1,7 @@
 // src/helpers/helpers.ts
 
 import type {HydrationPayload} from '../App';
+import type {ExportMode} from './exportTypes';
 import type {MediaItem} from '../hooks/useVerifiedMediaFiles';
 import {type MediaFile} from '../types/filterTypes';
 import {rnLogger} from '../utils/rnLogger';
@@ -63,19 +64,19 @@ export const trimBase64 = ({
  * @param data - The hydration data payload
  * @param source - The source of the hydration data (e.g. server, local storage)
  * @param setMediaFiles - A function to set the media files state
- * @param setPost - A function to set the post state
+ * @param setExportMode - Layout + export mode from RN hydration
  */
 export const applyHydrationData = async (
   data: HydrationPayload,
   source: string,
   setMediaFiles: (files: MediaFile[] | []) => void,
-  setPost: React.Dispatch<React.SetStateAction<boolean>>,
+  setExportMode: React.Dispatch<React.SetStateAction<ExportMode>>,
 ) => {
   const payload = trimBase64({files: data.file});
   rnLogger.log(`📥 Applying HYDRATE from ${source}:`, payload);
 
   setMediaFiles(data.file ?? []);
-  setPost(data.post);
+  setExportMode(data.exportMode);
 };
 
 export function computeCoverFit(

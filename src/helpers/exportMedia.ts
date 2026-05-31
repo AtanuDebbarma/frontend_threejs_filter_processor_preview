@@ -15,9 +15,9 @@ import {
 import {sendSaveChunks} from './saveBridge';
 import {
   DEFAULT_SAVE_CHUNK_BYTES,
-  resolveExportDimensions,
-  SAVE_PHOTO_MAX_BLOB_BYTES,
+  resolveExportDimensionsForMode,
   type ExportMode,
+  SAVE_PHOTO_MAX_BLOB_BYTES,
   type SaveExportDataPayload,
   type StartSaveExportPayload,
 } from './exportTypes';
@@ -123,7 +123,7 @@ export type ExportGalleryResult =
 export const exportActiveSlideForGallery = async (
   fileId: string,
   index: number,
-  mode: ExportMode = 'post',
+  exportMode: ExportMode,
   saveOptions?: Pick<StartSaveExportPayload, 'writePath' | 'chunkSizeBytes'>,
 ): Promise<ExportGalleryResult> => {
   const state = appStore.getState();
@@ -154,8 +154,8 @@ export const exportActiveSlideForGallery = async (
   const videoCount = state.mediaFiles.filter(
     f => f.mediaType === 'video',
   ).length;
-  const {width, height} = resolveExportDimensions(
-    mode,
+  const {width, height} = resolveExportDimensionsForMode(
+    exportMode,
     media.mediaType,
     videoCount,
   );

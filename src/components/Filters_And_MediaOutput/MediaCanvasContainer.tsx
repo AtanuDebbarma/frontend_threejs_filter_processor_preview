@@ -17,11 +17,13 @@ import {
 } from '../../hooks/useVerifiedMediaFiles';
 import {trimBase64} from '../../helpers/other_helpers';
 import {MediaCanvas} from './MediaCanvas';
+import type {ExportMode} from '@/helpers/exportTypes';
+import {isPostLayoutMode} from '@/helpers/exportTypes';
 
 export const MediaCanvasContainer = ({
-  post,
+  exportMode,
 }: {
-  post: boolean;
+  exportMode: ExportMode;
 }): React.ReactNode => {
   // const activeFilter = appStore(state => state.activeFilter);
   const mediaFiles = appStore(state => state.mediaFiles);
@@ -34,6 +36,7 @@ export const MediaCanvasContainer = ({
   const globalMutedState = appStore(state => state.videoMutedState);
   const setVideoMutedState = appStore(state => state.setVideoMutedState);
   const isSaveExporting = appStore(state => state.isSaveExporting);
+  const isPostExporting = appStore(state => state.isPostExporting);
 
   const [initialized, setInitialized] = useState(false);
   const [aspectType, setAspectType] = useState<
@@ -132,7 +135,7 @@ export const MediaCanvasContainer = ({
   // UPDATED: toggle play/pause with timeout (like RN code)
   const togglePlayForIndex = useCallback(
     async (index: number) => {
-      if (isSaveExporting) return;
+      if (isSaveExporting || isPostExporting) return;
       const ref = getVideoRef(index);
       const vid = ref.current;
       if (!vid) return;
@@ -177,7 +180,7 @@ export const MediaCanvasContainer = ({
         }
       }, 180);
     },
-    [getVideoRef, isSaveExporting],
+    [getVideoRef, isSaveExporting, isPostExporting],
   );
 
   // called when canvas/mesh is tapped (from FilteredMedia)
@@ -392,7 +395,11 @@ export const MediaCanvasContainer = ({
         />
       </div>
     );
-  } else if (!post && mediaList[0] && mediaList.length) {
+  } else if (
+    !isPostLayoutMode(exportMode) &&
+    mediaList[0] &&
+    mediaList.length
+  ) {
     return (
       <div className="h-full w-full shrink-0 snap-center overflow-hidden bg-gray-950">
         {mediaList[0].mediaType === 'video' ? (
@@ -404,7 +411,7 @@ export const MediaCanvasContainer = ({
               <MediaCanvas
                 id={mediaList[0].id}
                 video={true}
-                post={post}
+                exportMode={exportMode}
                 mediaList={mediaList}
                 aspectType={aspectType}
                 getVideoRef={getVideoRef}
@@ -457,7 +464,7 @@ export const MediaCanvasContainer = ({
               <MediaCanvas
                 id={mediaList[0].id}
                 video={false}
-                post={post}
+                exportMode={exportMode}
                 mediaList={mediaList}
                 aspectType={aspectType}
                 getVideoRef={undefined}
@@ -482,7 +489,7 @@ export const MediaCanvasContainer = ({
         )}
       </div>
     );
-  } else if (post && mediaList && mediaList.length) {
+  } else if (isPostLayoutMode(exportMode) && mediaList && mediaList.length) {
     return (
       <>
         {mediaList.map((media, index) => (
@@ -507,7 +514,7 @@ export const MediaCanvasContainer = ({
                   <MediaCanvas
                     id={media.id}
                     video={true}
-                    post={post}
+                    exportMode={exportMode}
                     mediaList={undefined}
                     aspectType={aspectType}
                     getVideoRef={getVideoRef}
@@ -567,7 +574,7 @@ export const MediaCanvasContainer = ({
                   <MediaCanvas
                     id={media.id}
                     video={false}
-                    post={post}
+                    exportMode={exportMode}
                     mediaList={undefined}
                     aspectType={aspectType}
                     getVideoRef={undefined}

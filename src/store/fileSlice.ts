@@ -37,7 +37,9 @@ export type FileSliceType = {
   setIsPostExporting: (exporting: boolean) => void;
   postExportFileCount: number;
   postExportItems: PostExportItem[];
+  postExportCancelRequested: boolean;
   setPostExportConfig: (fileCount: number, items: PostExportItem[]) => void;
+  setPostExportCancelRequested: (cancel: boolean) => void;
   resetPostExport: () => void;
 };
 
@@ -74,16 +76,23 @@ export const createFileSlice: StateCreator<
     }),
   postExportFileCount: 0,
   postExportItems: [],
+  postExportCancelRequested: false,
   setPostExportConfig: (fileCount, items) =>
     set(state => {
       state.postExportFileCount = fileCount;
       state.postExportItems = items;
+      state.postExportCancelRequested = false;
+    }),
+  setPostExportCancelRequested: cancel =>
+    set(state => {
+      state.postExportCancelRequested = cancel;
     }),
   resetPostExport: () =>
     set(state => {
       state.isPostExporting = false;
       state.postExportFileCount = 0;
       state.postExportItems = [];
+      state.postExportCancelRequested = false;
     }),
 
   /**

@@ -1,179 +1,222 @@
 # Mobeet Create Post Media Editor
 
-Production WebView bundle for the **Mobeet** create-post flow. It provides real-time GPU filter and adjustment preview, in-WebView export (WebCodecs / canvas), and a bidirectional bridge to the React Native host app in **`mbt/`**.
+Production **WebView bundle** for the Mobeet create-post flow (`mbt/`). It renders GPU filter preview (Three.js / R3F), runs in-WebView export (WebCodecs + canvas), and talks to React Native over `postMessage`.
 
-This package is **not** a standalone product. It ships as a single-file `index.html` (Vite + `vite-plugin-singlefile`), delivered to the app over the air and loaded from disk — not bundled inside the APK/IPA.
+This package is **not** a standalone app. It ships as a single **`index.html`** (Vite + `vite-plugin-singlefile`), delivered OTA and loaded from disk in the WebView — not embedded in the APK/IPA.
 
-**Planning docs:** [`../mbt/docs/createPost/CreatePost_MediaEditor_Tasks.md`](../mbt/docs/createPost/CreatePost_MediaEditor_Tasks.md), [`../plan_docs/Technical_Requirements.md`](../plan_docs/Technical_Requirements.md)
+| | |
+| --- | --- |
+| **Folder name** | `frontend_threejs_filter_processor_preview` (historical) |
+| **RN host** | `mbt/app/features/createPost/` → `MediaProcessorMain` |
+| **Deep docs** | [`../mbt/docs/createPost/CreatePostMediaFilterPipeline.md`](../mbt/docs/createPost/CreatePostMediaFilterPipeline.md), [`../mbt/docs/createPost/CreatePost_MediaEditor_Tasks.md`](../mbt/docs/createPost/CreatePost_MediaEditor_Tasks.md) |
 
 ## Table of contents
 
-- [Overview](#overview)
-- [Relationship to mbt](#relationship-to-mbt)
-- [Features](#features)
-- [Architecture](#architecture)
+- [What it does](#what-it-does)
+- [How it reaches the phone](#how-it-reaches-the-phone)
+- [Layout modes (`exportMode`)](#layout-modes-exportmode)
+- [Source layout](#source-layout)
 - [RN ↔ Web protocol](#rn--web-protocol)
-- [Export modes](#export-modes)
+- [Export](#export)
+- [Preview quality](#preview-quality)
 - [Tech stack](#tech-stack)
 - [Development](#development)
+- [Publish (OTA)](#publish-ota)
+- [Fonts OTA (separate)](#fonts-ota-separate)
 - [Scripts](#scripts)
-- [Project status](#project-status)
-- [Contributing](#contributing)
-- [License](#license)
+- [Status](#status)
+- [Contributing & license](#contributing--license)
 
-## Overview
+## What it does
 
-| Aspect | Detail |
-| ------ | ------ |
-| **Host** | Mobeet Expo app (`mbt/`) — `MediaProcessorMain` WebView |
-| **Delivery** | GitHub Pages (`docs/` on branch) → `index.html` + `manifest.json`; RN `editorUpdater` caches to sandbox; WebView `source={{ uri: file://... }}` |
-| **Preview** | Three.js / React Three Fiber + GLSL shaders on photos and video |
-| **Export** | In-WebView encode (WebCodecs for video, `canvas.toBlob` for images) — **not** native FFmpeg / `VideoProcessor` |
-| **Build output** | One self-contained `index.html` (JS, CSS, fonts, assets inlined) |
+- **GPU filters** — GLSL pipeline: brightness, contrast, saturation, gamma, hue, color balance, curves (512-sample LUT), shadows/highlights, temperature, blur, unsharp (`src/assets/shaders.ts`).
+- **Photo & video** — Same WebGL canvas; video uses `VideoTexture` for preview and `VideoFrameTexture` + sync `gl.render` for export.
+- **Multi-media carousel** — Snap-scroll; per-slide filters, adjust transforms, and editor sliders.
+- **Adjust menu** — CSS preview frame math aligned 1:1 with R3F `FilteredMedia` plane layout (`useAdjustPreviewLayout`).
+- **Text layers** — R3F text sprites on the export canvas (menus + `TextLayersCanvas`); font files via separate Fonts OTA on RN.
+- **Tags** — Per-media user tags on **images only** (not video).
+- **Save & Post export** — Encode in WebView; RN handles gallery write (stream/chunk) or S3 handoff (`s3Url` only for post).
 
-Legacy paths (`window.__EXPO_MEDIA__`, `PATCH_STATE`, `CURRENT_ACTIVE_VALUES` for native export) are being removed as part of the media-editor rollout. See plan docs Phase 5+.
+**UI present, not create-post MVP:** stickers, audio menus.
 
-## Relationship to mbt
+## How it reaches the phone
 
-```
-mbt/ (React Native)
-  └── create-post → MediaProcessorMain
-        ├── editorUpdater (OTA cache, manifest sha256)
-        ├── mediaServer (localhost HTTP → HYDRATE URLs)
-        └── WebView → this repo's index.html (file://)
-```
-
-When you change `postMessage` types or hydration shape, update **both** this repo and `mbt/app/features/createPost/` (and `webViewHelpers.ts`) in the same change set.
-
-## Features
-
-- **Real-time GPU filters** — GLSL pipeline (brightness, contrast, saturation, gamma, hue, color balance, curves, shadows/highlights, temperature, blur, unsharp mask).
-- **Photo and video** — Image textures and HTML5 video on the same WebGL canvas.
-- **Multi-media carousel** — Snap-scroll for multiple attachments per post.
-- **Filter presets** — Categorized LUT-style presets.
-- **Adjust menu** — Per-media sliders, background color; **per-media user tags on images only** (not video).
-- **Editor menu** — Per-media editor controls with live preview.
-- **Post / Story modes** — Layout and aspect ratio for post vs story.
-- **RN ↔ Web bridge** — Typed `postMessage` protocol (hydration, export, save, modals, theme).
-- **Single-file build** — Entire app in one HTML file for OTA and WebView load.
-
-**Deferred / UI only:** text overlays, stickers, audio (menus present; not part of create-post MVP).
-
-## Architecture
-
-```
-React Native (mbt/)
-    │
-    │  OTA: manifest.json → cache index.html → file:// WebView
-    │  Runtime: mediaServer → HYDRATE (http://127.0.0.1/... URLs)
-    │
-    ▼
-App.tsx  ──  Zustand (appStore)
-    │            ├── fileSlice, buttonSlices, filterSlice
-    │            ├── editorSlice, adjustSlice
-    │
-    ├── MediaComponent → MediaCanvasContainer → MediaCanvas
-    │       └── FilteredMedia (ShaderMaterial + shaders.ts)
-    │
-    └── Menus (BottomBar, FilterMenu, AdjustMenu, EditorMenu, …)
+```text
+mbt/ (Expo)
+  create-post → MediaProcessorMain
+    ├── editorUpdater     OTA: manifest.json → cache index.html → file:// WebView
+    ├── mediaServer       localhost HTTP → media URIs in hydration (no base64 in payload)
+    └── WebView           loads cached editor HTML
 ```
 
-Export helpers live under `src/` (e.g. `exportMedia`, `uploadExport`) as implementation progresses; see Tasks Phases 8–10.
+When you change hydration shape, `postMessage` types, or export contracts, update **this repo and `mbt/`** in the same change set (`webViewHelpers.ts`, `webViewTypes.ts`, bridge handlers).
+
+## Layout modes (`exportMode`)
+
+Hydration sends `exportMode: 'post' | 'reel' | 'story'` (replaces legacy `post: boolean`).
+
+| Mode | Carousel fit | Aspect | Export sizes (full) |
+| ---- | ------------ | ------ | ------------------- |
+| `post` | `cover` | 4:5 | 1080×1350 |
+| `reel` / `story` | `contain` | 9:16 | 1080×1920 |
+
+Multi-**video** post batch uses lower encode targets (RAM): **960×1200** (post) / **960×1712** (9:16). See `src/helpers/exportTypes.ts`.
+
+Invalid `exportMode` in hydration logs a warning and defaults to `'post'`.
+
+## Source layout
+
+```text
+src/
+  App.tsx                          Shell, RN message handler, hydration
+  assets/shaders.ts                Vertex + fragment shaders
+  assets/filters/                  Preset filter definitions
+  components/
+    Filters_And_MediaOutput/       MediaCanvas, FilteredMedia, carousel
+    Menus/                         Filter, Adjust, Editor, Text, BottomBar
+  helpers/
+    hydrationBridge.ts             applyHydrationFromPayload
+    exportTypes.ts                 Dimensions, exportMode, DPR cap
+    exportMedia.ts                 Save (active slide)
+    postExportMedia.ts             Post batch encode + upload
+    exportVideoMp4.ts              WebCodecs / Mediabunny path
+    saveBridge.ts / postBridge.ts  Web → RN messages
+  hooks/                           Adjust layout, gestures, element size
+  store/                           Zustand (appStore, slices)
+  types/webBridgeTypes.ts          Hydration + bridge types
+scripts/
+  generate-manifest.mjs            OTA manifest (sha256) after build
+  copy-pages.mjs                   dist → docs/
+  generate-fonts-manifest.mjs      Fonts OTA (see OTA_Fonts/)
+```
 
 ## RN ↔ Web protocol
 
-Authoritative message list: **`plan_docs/Technical_Requirements.md`** §4 and **`CreatePost_MediaEditor_Tasks.md`** Phase 5.
+**Authoritative lists:** `mbt/docs/createPost/CreatePost_MediaEditor_Tasks.md`, `mbt/app/features/createPost/types/webViewTypes.ts`.
 
-### RN → Web
+### Hydration (RN → Web)
 
-| Message | Purpose |
-| ------- | ------- |
-| `HYDRATE` | Initial media (`http://127.0.0.1/...`) |
-| `UPDATE_ASSETS` | Add more media from gallery |
-| `UPDATE_FILTER_SETTINGS` | Theme colors, safe area insets |
-| `START_SAVE_EXPORT` | Gallery save — `{ saveUrl, uploadToken, … }` |
-| `START_EXPORT_VIDEO` / `START_EXPORT_IMAGE` | Post export — presigned URL per file |
-| `PAUSE_EXPORT` / `RESUME_EXPORT` | App background handling |
+RN injects `window.__EXPO_MEDIA__` and fires `mediaReady` before/at `WEB_READY`:
 
-### Web → RN
+| Field | Notes |
+| ----- | ----- |
+| `file[]` | `uri` = `file://` / local paths from RN (not base64) |
+| `exportMode` | `'post' \| 'reel' \| 'story'` |
+| `dpr` | Device pixel ratio for GL |
+| `appColors`, `insets` | Theme + safe area |
+| `uploadEndpoint` | Optional presigned post URL |
 
-| Message | Purpose |
-| ------- | ------- |
-| `CAPABILITIES` | `{ webCodecs }` on mount |
-| `WEB_READY` | Editor shell ready (no media yet) |
-| `FILES_LOADED` | Media in memory — RN may stop read server |
-| `REQUEST_SAVE_TO_DEVICE` | User tapped Save (active slide) |
-| `EXPORT_PROGRESS` | Encode / upload progress |
-| `SAVE_EXPORT_COMPLETE` / `SAVE_EXPORT_FAILED` | Gallery save result |
-| `EXPORT_SUCCESS` / `IMAGE_EXPORT_SUCCESS` | Post — **`{ s3Url }` only** |
-| `EXPORT_FAILED` | Export error |
-| `TAG_SEARCH` / `TAG_SEARCH_CANCEL` | Image tag UX |
-| `ADJUST_MENUS_OPEN` / `MENUS_CLOSE` | Block post while editing |
-| `BUTTONS_CLICK` | Close / add more |
-| `LOG_ERROR` | Forward web errors |
+### Runtime messages
 
-**Retired (do not document for new work):** `window.__EXPO_MEDIA__`, `mediaReady`, `PATCH_STATE`, `CURRENT_ACTIVE_VALUES`, `EXPORT_DATA_RECEIVED`, `SAVE_DATA_RECEIVED` for native/blob handoff.
+**RN → Web**
 
-## Export modes
+| Type | Purpose |
+| ---- | ------- |
+| `PATCH_STATE` | Theme / insets patch |
+| `MODAL_STATE_CHANGE` | Block interactions while RN modal open |
+| `START_SAVE_EXPORT` | Gallery save — active slide, `writePath`, chunk size |
+| `START_POST_EXPORT` | Batch post — file list + presigned upload |
+| `SAVE_EXPORT_COMPLETE` / `SAVE_EXPORT_FAILED` | Save lifecycle |
+| `SET_LOG_CONFIG` | Production logging toggle |
 
-| Mode | Trigger (RN) | Output |
-| ---- | -------------- | ------ |
-| **Save** | `EditorMenuMain` — active slide only | Encoded bytes streamed `POST` to RN localhost → device gallery; small `postMessage` metadata |
-| **Post** | `NameAndInputContainer` — all attachments | Web PUT to presigned S3 → RN receives `s3Url` strings → `createPost` GraphQL |
+**Web → RN**
 
-Post export (images / single video): **1080×1350** (4:5). Reel/story (`!post`): **1080×1920** (9:16). Multi-video Post batch: **864×1080** / **864×1536**. See Tasks §8–9.
+| Type | Purpose |
+| ---- | ------- |
+| `CAPABILITIES` | `{ webCodecs }` on load |
+| `WEB_READY` | Shell ready after hydration |
+| `FILES_LOADED` | Media textures ready — RN may stop media server |
+| `REQUEST_SAVE_TO_DEVICE` | User tapped Save |
+| `EXPORT_SAVE_STARTED` | Save encode started |
+| `SAVE_EXPORT_DATA` / `SAVE_EXPORT_CHUNK` | Encoded bytes or chunks to RN |
+| `EXPORT_PROGRESS` | Encode / write / upload progress |
+| `POST_EXPORT_ACK` | Post batch accepted |
+| `EXPORT_SUCCESS` | Post file done — **`{ s3Url }`** |
+| `POST_EXPORT_FAILED` / `SAVE_EXPORT_FAILED` | Errors |
+| `ADJUST_MENUS_OPEN` / `MENUS_CLOSE` | UX guards |
+| `BUTTONS_CLICK`, `TAG_SEARCH`, `LOG_ERROR` | Misc |
+
+**Do not use for new work:** native `VideoProcessor` export, base64 hydration, `CURRENT_ACTIVE_VALUES`, `EXPORT_DATA_RECEIVED` blob handoff to native encode.
+
+## Export
+
+| Flow | Trigger | Web behavior | RN outcome |
+| ---- | ------- | ------------ | ---------- |
+| **Save** | `EditorMenuMain` | `exportActiveSlideForGallery` — active slide | Stream/chunk to device gallery |
+| **Post** | `NameAndInputContainer` | `runPostExportBatch(exportMode)` — all slides | PUT to presigned URL → `s3Url` per file → GraphQL |
+
+Video export uses **Mediabunny** decode → `VideoFrameTexture` → filtered `gl.render` per frame (no preview `<video>` seek during encode). Images: filtered canvas → `toBlob` → scale to target dimensions.
+
+## Preview quality
+
+| Knob | Location | Effect |
+| ---- | -------- | ------ |
+| DPR cap (2×) | `MAX_PREVIEW_DEVICE_PIXEL_RATIO` | Sharper GL without 3× buffer cost |
+| Photo anisotropy | `FilteredMedia` | Cleaner cover-cropped photos |
+| Curve LUT 512 | `createCurveTexture` | Smoother preset curves |
+| `u_texel` | `shaders.ts` | Blur/sharpen tied to **source** pixels (media `w`/`h`; export uses frame size) |
+
+Adjust **layout** parity is independent — plane math in `FilteredMedia` + `useAdjustPreviewLayout`.
 
 ## Tech stack
 
 | Layer | Library |
 | ----- | ------- |
 | UI | React 19 |
-| 3D / WebGL | Three.js, React Three Fiber |
+| 3D | Three.js, React Three Fiber |
+| Video encode | Mediabunny, WebCodecs (`VideoEncoder`) |
 | State | Zustand, Immer |
 | Styling | Tailwind CSS v4 |
 | Gestures | @use-gesture/react |
-| Animations | @react-spring/web |
-| Build | Vite, vite-plugin-singlefile |
+| Build | Vite 8, vite-plugin-singlefile |
 | Runtime | Bun |
 
 ## Development
 
 ```bash
 bun install
-bun run dev      # browser only — quick UI work
-bun run build    # dist/index.html (single file)
+bun run dev      # Vite — UI only; no RN bridge or file:// media
+bun run tsc      # typecheck
+bun run lint     # eslint
+bun run build    # dist/index.html + manifest.json
 ```
 
-For real media, filters, and bridge behavior, test inside the **mbt** dev client WebView after pointing it at your built or cached `index.html`. The dev server does not replicate RN `mediaServer`, OTA cache, or presigned upload.
+**Real integration testing** needs the **mbt** dev client: OTA or local `docs/`, `mediaServer`, and WebView `postMessage`. Optional: uncomment mock hydration in `App.tsx` for browser-only smoke tests.
 
-Optional: uncomment mock hydration in `App.tsx` for isolated browser testing (not a substitute for RN integration).
+## Publish (OTA)
 
-## Hosting (Vercel recommended for private repos)
+Build locally; deploy **`docs/`** (static). Recommended: **Vercel** — see [`docs/VERCEL_FIREWALL_SETUP.md`](docs/VERCEL_FIREWALL_SETUP.md).
 
-Build locally; deploy **`docs/`** to **Vercel** (or any static host). GitHub Actions deploy was removed to save CI minutes.
-
-**Full steps (Vercel project, WAF bypass, Bot Protection, headers):**  
-[`docs/VERCEL_FIREWALL_SETUP.md`](docs/VERCEL_FIREWALL_SETUP.md)
-
-**`mbt/.env` (after Vercel deploy):**
+**`mbt/.env` (example):**
 
 ```env
 EXPO_PUBLIC_EDITOR_MANIFEST_URL=https://your-project.vercel.app/manifest.json
-EXPO_PUBLIC_EDITOR_OTA_KEY=<same-secret-as-vercel-waf-bypass-rule>
+EXPO_PUBLIC_EDITOR_OTA_KEY=<same-secret-as-waf-bypass-header>
 ```
 
-The app sends header `X-Mobeet-Editor-Client` on manifest/HTML fetch (see `editorUpdater.ts`).
-
-### Publish a new editor version
+RN sends `X-Mobeet-Editor-Client` on manifest/HTML fetch (`editorUpdater.ts`).
 
 ```bash
-bun run pages:publish    # build + copy dist → docs/ (incl. robots.txt)
+bun run pages:publish   # build + copy dist → docs/
 git add docs/
-git commit -m "chore(editor): publish pages 0.0.x"
+git commit -m "chore(editor): publish 0.0.x"
 git push
 ```
 
-Bump **`version`** in `package.json` before publish when you want the app OTA to pick up a new bundle.
+Bump **`version`** in `package.json` when you want clients to download a new bundle (manifest sha256 changes).
+
+`docs/index.html` is **generated (~2MB)** — commit only when publishing.
+
+## Fonts OTA (separate)
+
+Editor HTML and **font files** use **different** manifests.
+
+1. Add `.ttf` / `.otf` under `OTA_Fonts/`, bump `OTA_Fonts/version.json`
+2. `bun run fonts:ota` → `docs/OTA_Fonts/`
+3. Deploy `docs/` with the editor
+4. RN: `EXPO_PUBLIC_FONT_MANIFEST_URL` + `fontUpdater.ts`
+
+`pages:publish` does **not** run `fonts:ota`. See [`OTA_Fonts/README.md`](OTA_Fonts/README.md).
 
 ## Scripts
 
@@ -181,50 +224,38 @@ Bump **`version`** in `package.json` before publish when you want the app OTA to
 | ------ | ------- |
 | Dev server | `bun run dev` |
 | Production build | `bun run build` |
-| Copy build to `docs/` | `bun run pages:copy` |
-| Build + copy (publish prep) | `bun run pages:publish` |
 | Typecheck | `bun run tsc` |
 | Lint | `bun run lint` |
 | Format | `bun run format` |
 | Preview build | `bun run preview` |
+| Copy build → `docs/` | `bun run pages:copy` |
+| Build + copy | `bun run pages:publish` |
+| Fonts manifest | `bun run fonts:ota` |
 
-Before a PR: run **`bun run tsc`** and **`bun run lint`**.
+Before a PR: **`bun run tsc`** and **`bun run lint`**.
 
-**Note:** `docs/` contains generated ~2MB `index.html` — commit it only when publishing to Pages.
-
-## Project status
+## Status
 
 | Area | Status |
 | ---- | ------ |
 | GPU preview (photo / video) | Shipped |
-| Multi-media carousel, filters, adjust, editor menus | Shipped |
-| Single-file build | Shipped |
-| OTA delivery + `file://` load (no APK bundle) | Planned — Tasks Phase 2 |
-| `HYDRATE` / localhost server (no base64) | Planned — Phases 4–5 |
-| Save to gallery (WebView export + stream POST) | Planned — Phases 8–9 |
-| Post to S3 (`s3Url` only to RN) | Planned — Phase 10 |
-| Text / stickers / audio | UI only — not MVP |
+| Carousel, filters, adjust, editor | Shipped |
+| `exportMode` layout (post / reel / story) | Shipped |
+| Hydration via `__EXPO_MEDIA__` + local URIs | Shipped |
+| Save export (WebView → RN gallery) | Shipped |
+| Post export (WebView encode → S3 → `s3Url`) | Shipped |
+| Single-file OTA + `file://` WebView | Shipped |
+| Text on canvas + text menus | Shipped (device QA ongoing) |
+| Fonts OTA (RN) | Shipped (separate manifest) |
+| Stickers / audio | UI only |
 
-## Contributing
+## Contributing & license
 
-1. Branch from your team’s main integration branch.
-2. Keep changes focused; coordinate protocol changes with **`mbt/`**.
+1. Branch from your team integration branch.
+2. Coordinate **protocol and hydration** changes with **`mbt/`**.
 3. Run **`bun run tsc`** and **`bun run lint`** before opening a PR.
-4. Update **`plan_docs/`** when behavior or messages change in a non-obvious way.
+4. Update **`mbt/docs/createPost/`** when message contracts change.
 
-## License
+**License:** Mobeet Technologies Private Limited — Proprietary. See [LICENSE](./LICENSE). Licensing: **mobeetdotcom@gmail.com**
 
-**Mobeet Technologies Private Limited — Proprietary.** All rights reserved.
-
-This software is proprietary and confidential. See [LICENSE](./LICENSE) for full terms.
-
-Licensing inquiries: **mobeetdotcom@gmail.com**
-
-## Contributors
-
-- **Author:** Atanu Debbarma
-- **Contributors:** Abhijit Sinha, Kuchuk Debbarma
-
----
-
-_Package folder name `frontend_threejs_filter_processor_preview` is historical; this repo is the production create-post editor bundle._
+**Author:** Atanu Debbarma · **Contributors:** Abhijit Sinha, Kuchuk Debbarma

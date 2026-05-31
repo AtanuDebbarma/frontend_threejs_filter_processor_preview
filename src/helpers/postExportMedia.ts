@@ -23,7 +23,7 @@ import {
   postExportSuccess,
   postPostExportFailed,
 } from './postBridge';
-import {resolveExportDimensions, type ExportMode} from './exportTypes';
+import {resolveExportDimensionsForMode, type ExportMode} from './exportTypes';
 import {uploadEncodedMediaToEndpoint} from './uploadExport';
 
 const waitForAnimationFrame = (): Promise<void> =>
@@ -59,7 +59,7 @@ const resolveMimeType = (blob: Blob, mediaType: 'photo' | 'video'): string => {
 export const exportSlideToBlob = async (
   index: number,
   fileId: string,
-  mode: ExportMode = 'post',
+  exportMode: ExportMode,
 ): Promise<Blob> => {
   const state = appStore.getState();
   const media = state.mediaFiles[index];
@@ -85,8 +85,8 @@ export const exportSlideToBlob = async (
   const videoCount = state.mediaFiles.filter(
     f => f.mediaType === 'video',
   ).length;
-  const {width, height} = resolveExportDimensions(
-    mode,
+  const {width, height} = resolveExportDimensionsForMode(
+    exportMode,
     media.mediaType,
     videoCount,
   );
@@ -121,7 +121,9 @@ export const exportSlideToBlob = async (
 /**
  * Encode → upload → EXPORT_SUCCESS per file (one Blob in memory at a time).
  */
-export const runPostExportBatch = async (): Promise<void> => {
+export const runPostExportBatch = async (
+  exportMode: ExportMode,
+): Promise<void> => {
   const state = appStore.getState();
   const {postExportItems, postExportFileCount, postUploadEndpointUrl} = state;
   const fileCount = postExportFileCount || postExportItems.length;
@@ -146,6 +148,11 @@ export const runPostExportBatch = async (): Promise<void> => {
 
   try {
     for (let fileIndex = 0; fileIndex < postExportItems.length; fileIndex++) {
+      if (appStore.getState().postExportCancelRequested) {
+        rnLogger.log('📤 Post export batch paused (cancel requested)');
+        break;
+      }
+
       const item = postExportItems[fileIndex];
       const {id, index, mediaType} = item;
 
@@ -156,19 +163,19 @@ export const runPostExportBatch = async (): Promise<void> => {
         id,
         percent: 0,
         stage: 'encoding',
-        fileIndex,
+        fileIndex: index,
         fileCount,
       });
 
       let blob: Blob | null = null;
       try {
-        blob = await exportSlideToBlob(index, id, 'post');
+        blob = await exportSlideToBlob(index, id, exportMode);
 
         postExportProgress({
           id,
           percent: 100,
           stage: 'encoding',
-          fileIndex,
+          fileIndex: index,
           fileCount,
         });
 
@@ -194,7 +201,7 @@ export const runPostExportBatch = async (): Promise<void> => {
               id,
               percent: Math.min(100, Math.max(0, uploadPct)),
               stage: 'uploading',
-              fileIndex,
+              fileIndex: index,
               fileCount,
             });
           },
@@ -207,7 +214,7 @@ export const runPostExportBatch = async (): Promise<void> => {
           index,
           s3Url,
           mediaType,
-          fileIndex,
+          fileIndex: index,
           fileCount,
         });
       } catch (fileErr) {
@@ -222,7 +229,7 @@ export const runPostExportBatch = async (): Promise<void> => {
           error: message,
           technicalError: technical,
           mediaType,
-          fileIndex,
+          fileIndex: index,
           fileCount,
         });
         throw fileErr;
@@ -243,7 +250,13 @@ export const runPostExportBatch = async (): Promise<void> => {
     );
     throw err;
   } finally {
+    const wasCancelled = appStore.getState().postExportCancelRequested;
+    appStore.getState().setPostExportCancelRequested(false);
     appStore.getState().setIsPostExporting(false);
-    appStore.getState().resetPostExport();
+    if (!wasCancelled) {
+      appStore.getState().resetPostExport();
+    } else {
+      appStore.getState().setPostExportConfig(0, []);
+    }
   }
 };

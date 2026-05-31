@@ -10,11 +10,13 @@ import {
 import {appStore} from '../../store/appStore';
 import {defaultAdjustTransform} from '../../store/adjustSlice';
 import {useElementSize} from '../../hooks/useElementSize';
+import type {ExportMode} from '@/helpers/exportTypes';
+import {isPostLayoutMode} from '@/helpers/exportTypes';
 
 type Props = {
   id: string;
   video: boolean;
-  post: boolean;
+  exportMode: ExportMode;
   mediaList?: MediaItem[];
   aspectType: 'square' | 'landscape' | 'vertical';
   getVideoRef?: (index: number) => React.RefObject<HTMLVideoElement | null>;
@@ -27,7 +29,7 @@ type Props = {
 export const MediaCanvas = ({
   id,
   video,
-  post,
+  exportMode,
   mediaList,
   aspectType,
   getVideoRef,
@@ -82,7 +84,12 @@ export const MediaCanvas = ({
         id={`canvas-${aspectType}-${index}`}
         style={{width: '100%', height: '100%', zIndex: 100}}
         camera={{position: [0, 0, 5], fov: 50}}
-        gl={{antialias: true, alpha: true, preserveDrawingBuffer: true}}
+        gl={{
+          antialias: true,
+          alpha: true,
+          preserveDrawingBuffer: true,
+          powerPreference: 'high-performance',
+        }}
         onCreated={state => {
           setExportCanvas(index, state.gl.domElement);
           setExportRenderer(index, {invalidate: state.invalidate});
@@ -94,7 +101,7 @@ export const MediaCanvas = ({
           aspectType={aspectType}
           originalWidth={files().width}
           originalHeight={files().height}
-          fit={post ? 'cover' : 'contain'}
+          fit={isPostLayoutMode(exportMode) ? 'cover' : 'contain'}
           videoRef={getVideoRef ? getVideoRef(index) : undefined}
           handleTap={() => (handleTap ? handleTap(index) : undefined)}
           muted={mutedMap ? mutedMap[index] : false}

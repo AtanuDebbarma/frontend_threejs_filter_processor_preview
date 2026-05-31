@@ -6,6 +6,7 @@ import {appStore} from '../../store/appStore';
 import type {ColorBalance, Curve, FilterItem} from '../../types/filterTypes';
 import {scheduleClearApplying} from '../../utils/filter_utils';
 import {vertexShader, fragmentShader} from '../../assets/shaders';
+import {MAX_PREVIEW_DEVICE_PIXEL_RATIO} from '../../helpers/exportTypes';
 import {rnLogger} from '../../utils/rnLogger';
 import {trimBase64} from '../../helpers/other_helpers';
 import {setExportVideo} from '../../helpers/exportVideoRegistry';
@@ -29,7 +30,21 @@ type Props = {
   handleTap?: () => void;
   muted?: boolean;
   index: number;
-  post?: boolean;
+};
+
+const PHOTO_TEXTURE_MAX_ANISOTROPY = 4;
+
+const applyPhotoTextureSampling = (
+  tex: THREE.Texture,
+  renderer: THREE.WebGLRenderer,
+): void => {
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  if (maxAniso > 1) {
+    tex.anisotropy = Math.min(PHOTO_TEXTURE_MAX_ANISOTROPY, maxAniso);
+  }
 };
 
 export const FilteredMedia = (props: Props): React.JSX.Element => {
@@ -73,6 +88,8 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   const blur = currentSelectedEditor.blur ?? 0.0;
   const adjustByIndex = appStore(state => state.adjustByIndex);
   const isSaveExporting = appStore(state => state.isSaveExporting);
+  const isPostExporting = appStore(state => state.isPostExporting);
+  const isVideoPipelineExporting = isSaveExporting || isPostExporting;
   const adjustTransform =
     adjustByIndex[mediaIndex].id === props.id
       ? adjustByIndex[mediaIndex].value
@@ -90,11 +107,12 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   useEffect(() => {
     if (!gl) return;
     const storeDpr = appStore.getState().dpr || window.devicePixelRatio || 1;
-    gl.setPixelRatio(storeDpr);
+    const cappedDpr = Math.min(storeDpr, MAX_PREVIEW_DEVICE_PIXEL_RATIO);
+    gl.setPixelRatio(cappedDpr);
     rnLogger.componentLog(
       'FilteredMedia',
       'log',
-      `DPR check → Web: ${window.devicePixelRatio}, RN: ${appStore.getState().dpr}, GL: ${gl.getPixelRatio()}`,
+      `DPR check → Web: ${window.devicePixelRatio}, RN: ${appStore.getState().dpr}, GL: ${gl.getPixelRatio()} (cap ${MAX_PREVIEW_DEVICE_PIXEL_RATIO})`,
     );
   }, [gl]);
 
@@ -103,7 +121,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     if (!props.isVideo) {
       return;
     }
-    if (!isSaveExporting) {
+    if (!isVideoPipelineExporting) {
       setExportFrameDriver(props.index, null);
       if (exportVftRef.current) {
         exportVftRef.current.dispose();
@@ -128,7 +146,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         exportVftRef.current = null;
       }
     };
-  }, [isSaveExporting, props.isVideo, props.index]);
+  }, [isVideoPipelineExporting, props.isVideo, props.index]);
 
   useEffect(() => {
     if (!gl) return;
@@ -256,9 +274,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         // onLoad
         loadedTex => {
           try {
-            loadedTex.generateMipmaps = true;
-            loadedTex.minFilter = THREE.LinearMipmapLinearFilter;
-            loadedTex.magFilter = THREE.LinearFilter;
+            applyPhotoTextureSampling(loadedTex, gl);
             loadedTex.needsUpdate = true;
             setMediaTextureState(prev => {
               if (prev) toDisposeRef.current.push(prev); // 🚨 SAFE DISPOSAL
@@ -295,9 +311,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       );
 
       // set initial (possibly used) texture synchronously as your code already did
-      tex.generateMipmaps = true;
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
-      tex.magFilter = THREE.LinearFilter;
+      applyPhotoTextureSampling(tex, gl);
       tex.needsUpdate = true;
 
       setMediaTextureState(prev => {
@@ -528,7 +542,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   }, [props.uri, props.isVideo, gl]);
 
   useFrame(() => {
-    if (isSaveExporting && props.isVideo) {
+    if (isVideoPipelineExporting && props.isVideo) {
       return;
     }
 
@@ -554,7 +568,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
 
   // ---------- curve texture creation ----------
   const createCurveTexture = useCallback((curves?: Curve[] | undefined) => {
-    const size = 256;
+    const size = 512;
     // 4 bytes per texel (RGBA) to avoid GL_RGB/texStorage2D issues on ANGLE
     const data = new Uint8Array(size * 4);
 
@@ -885,7 +899,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
 
   // Save export: synchronous gl.render per decoded frame (no useFrame / rAF).
   useEffect(() => {
-    if (!props.isVideo || !isSaveExporting || !exportVftRef.current) {
+    if (!props.isVideo || !isVideoPipelineExporting || !exportVftRef.current) {
       setExportFrameDriver(props.index, null);
       return;
     }
@@ -902,9 +916,9 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
           mat.uniforms.tDiffuse.value = vft;
         }
         if (mat?.uniforms?.u_texel) {
-          const w = Math.max(1, frame.displayWidth);
-          const h = Math.max(1, frame.displayHeight);
-          mat.uniforms.u_texel.value.set(1 / w, 1 / h);
+          const frameW = Math.max(1, frame.displayWidth);
+          const frameH = Math.max(1, frame.displayHeight);
+          mat.uniforms.u_texel.value.set(1 / frameW, 1 / frameH);
         }
 
         gl.setRenderTarget(null);
@@ -923,7 +937,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     return () => {
       setExportFrameDriver(props.index, null);
     };
-  }, [isSaveExporting, props.isVideo, props.index, gl, scene, camera]);
+  }, [isVideoPipelineExporting, props.isVideo, props.index, gl, scene, camera]);
 
   // update material uniforms if filter params change
   useEffect(() => {
