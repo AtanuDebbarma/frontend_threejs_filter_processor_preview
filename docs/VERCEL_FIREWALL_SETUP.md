@@ -26,9 +26,12 @@ Also set in **`mbt/.env`**:
 
 ```env
 EXPO_PUBLIC_EDITOR_MANIFEST_URL=https://frontend-threejs-filter-processor-p.vercel.app/manifest.json
+EXPO_PUBLIC_FONT_MANIFEST_URL=https://frontend-threejs-filter-processor-p.vercel.app/OTA_Fonts/manifest.json
 ```
 
 Restart Metro after changing `.env`. Do **not** commit `.env`.
+
+**Fonts:** same `EXPO_PUBLIC_EDITOR_OTA_KEY` / `X-Mobeet-Editor-Client` header on **manifest fetch and each `.ttf` download** (`fontUpdater.ts`).
 
 Editor **version** bumps use `package.json` only — do **not** rotate this secret per release unless leaked.
 
@@ -40,22 +43,27 @@ Editor **version** bumps use `package.json` only — do **not** rotate this secr
 
 ### OTA deny — `OTA Deny — Mobeet app` → **Deny**
 
-Block `/manifest.json` and `/index.html` unless the app sends the secret header.
+Block editor and font OTA paths unless the app sends the secret header.
 
-Two blocks joined by **OR**:
+**Minimum paths:** `/manifest.json`, `/index.html`, `/OTA_Fonts/manifest.json`, and `/OTA_Fonts/*.ttf` (or use **Path starts with** `/OTA_Fonts/`).
+
+Example (two blocks joined by **OR**):
 
 | Block | If | And |
 | ----- | -- | --- |
 | A | Request Path **Equals** `/manifest.json` | Header `X-Mobeet-Editor-Client` **Does not equal** secret |
 | B | Request Path **Equals** `/index.html` | Header `X-Mobeet-Editor-Client` **Does not equal** secret |
+| C | Request Path **Starts with** `/OTA_Fonts/` | Header `X-Mobeet-Editor-Client` **Does not equal** secret |
 
 Also **AND** (same paths): header **Does not contain** secret (covers missing/wrong partial header).
 
 **Then:** **Deny**
 
 ```text
-(path = /manifest.json AND header bad/missing) OR (path = /index.html AND header bad/missing) → Deny
+(protected path AND header bad/missing) → Deny
 ```
+
+If you use a **catch-all** deny on `/*`, font `.ttf` downloads need the same header as the editor manifest (the app sends it on every OTA request after this fix).
 
 Without header → **403** (browser address bar and `curl`). With correct header → **200** + JSON/HTML.
 
@@ -80,4 +88,11 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 # 200 + JSON expected (use secret from mbt/.env)
 curl -sS -H "X-Mobeet-Editor-Client: YOUR_SECRET" \
   https://frontend-threejs-filter-processor-p.vercel.app/manifest.json
+
+# Font manifest + one .ttf (403 without header)
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  https://frontend-threejs-filter-processor-p.vercel.app/OTA_Fonts/manifest.json
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  -H "X-Mobeet-Editor-Client: YOUR_SECRET" \
+  https://frontend-threejs-filter-processor-p.vercel.app/OTA_Fonts/Poppins-Regular.ttf
 ```

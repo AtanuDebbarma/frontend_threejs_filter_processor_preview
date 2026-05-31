@@ -25,9 +25,6 @@ export const EXPORT_DIMENSIONS_BATCH: Record<
   story: {width: 960, height: 1712},
 };
 
-/** Cap R3F preview DPR — sharper than 1×, avoids 3× buffer cost on high-DPR phones. */
-export const MAX_PREVIEW_DEVICE_PIXEL_RATIO = 2;
-
 /** 4:5 carousel / post layout (vs 9:16 reel/story). */
 export const isPostLayoutMode = (mode: ExportMode): boolean => mode === 'post';
 

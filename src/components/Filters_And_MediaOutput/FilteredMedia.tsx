@@ -6,7 +6,6 @@ import {appStore} from '../../store/appStore';
 import type {ColorBalance, Curve, FilterItem} from '../../types/filterTypes';
 import {scheduleClearApplying} from '../../utils/filter_utils';
 import {vertexShader, fragmentShader} from '../../assets/shaders';
-import {MAX_PREVIEW_DEVICE_PIXEL_RATIO} from '../../helpers/exportTypes';
 import {rnLogger} from '../../utils/rnLogger';
 import {trimBase64} from '../../helpers/other_helpers';
 import {setExportVideo} from '../../helpers/exportVideoRegistry';
@@ -30,21 +29,6 @@ type Props = {
   handleTap?: () => void;
   muted?: boolean;
   index: number;
-};
-
-const PHOTO_TEXTURE_MAX_ANISOTROPY = 4;
-
-const applyPhotoTextureSampling = (
-  tex: THREE.Texture,
-  renderer: THREE.WebGLRenderer,
-): void => {
-  tex.generateMipmaps = true;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  const maxAniso = renderer.capabilities.getMaxAnisotropy();
-  if (maxAniso > 1) {
-    tex.anisotropy = Math.min(PHOTO_TEXTURE_MAX_ANISOTROPY, maxAniso);
-  }
 };
 
 export const FilteredMedia = (props: Props): React.JSX.Element => {
@@ -107,12 +91,11 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   useEffect(() => {
     if (!gl) return;
     const storeDpr = appStore.getState().dpr || window.devicePixelRatio || 1;
-    const cappedDpr = Math.min(storeDpr, MAX_PREVIEW_DEVICE_PIXEL_RATIO);
-    gl.setPixelRatio(cappedDpr);
+    gl.setPixelRatio(storeDpr);
     rnLogger.componentLog(
       'FilteredMedia',
       'log',
-      `DPR check → Web: ${window.devicePixelRatio}, RN: ${appStore.getState().dpr}, GL: ${gl.getPixelRatio()} (cap ${MAX_PREVIEW_DEVICE_PIXEL_RATIO})`,
+      `DPR check → Web: ${window.devicePixelRatio}, RN: ${appStore.getState().dpr}, GL: ${gl.getPixelRatio()}`,
     );
   }, [gl]);
 
@@ -274,7 +257,9 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
         // onLoad
         loadedTex => {
           try {
-            applyPhotoTextureSampling(loadedTex, gl);
+            loadedTex.generateMipmaps = true;
+            loadedTex.minFilter = THREE.LinearMipmapLinearFilter;
+            loadedTex.magFilter = THREE.LinearFilter;
             loadedTex.needsUpdate = true;
             setMediaTextureState(prev => {
               if (prev) toDisposeRef.current.push(prev); // 🚨 SAFE DISPOSAL
@@ -311,7 +296,9 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       );
 
       // set initial (possibly used) texture synchronously as your code already did
-      applyPhotoTextureSampling(tex, gl);
+      tex.generateMipmaps = true;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.magFilter = THREE.LinearFilter;
       tex.needsUpdate = true;
 
       setMediaTextureState(prev => {
