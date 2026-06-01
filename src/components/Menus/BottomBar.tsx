@@ -39,7 +39,7 @@ const BottomBar = ({
       className="flex flex-row items-center justify-center rounded-t-lg border-t border-gray-200 pt-5 text-sm font-medium shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
       style={{
         backgroundColor: appColors.bottomMenuBackground,
-        paddingBottom: `${safeInsets.bottom + 10}px`,
+        paddingBottom: `${safeInsets.bottom + 30}px`,
       }}>
       <button
         onClick={e => handleButtonToggle('filter', e)}

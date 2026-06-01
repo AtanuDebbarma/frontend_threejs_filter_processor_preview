@@ -1,5 +1,5 @@
 // src/hooks/useVerifiedMediaFiles.ts
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {rnLogger} from '../utils/rnLogger';
 import {trimBase64} from '../helpers/other_helpers';
 
@@ -44,6 +44,11 @@ const isBundledAssetUrl = (url: string) =>
 export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const createdUrlsRef = useRef<string[]>([]);
+
+  const filesKey = useMemo(
+    () => files.map(f => `${f.id}|${f.uri}`).join(','),
+    [files],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -220,7 +225,7 @@ export function useVerifiedMediaFiles(files: MediaFile[]): MediaItem[] {
       createdUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
       createdUrlsRef.current = [];
     };
-  }, [files]);
+  }, [filesKey, files]);
 
   return mediaList;
 }

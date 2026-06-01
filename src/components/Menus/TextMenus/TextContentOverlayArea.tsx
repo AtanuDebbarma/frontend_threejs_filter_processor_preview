@@ -5,15 +5,12 @@ import {appStore} from '@/store/appStore';
 import {defaultAdjustTransform} from '@/store/adjustSlice';
 import {initialTextLayerTransform} from '@/store/textSlice';
 import type {TextLayer, TextTransform} from '@/store/textSlice';
-import {faXmark} from '@fortawesome/free-solid-svg-icons';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {useElementSize} from '@/hooks/useElementSize';
 import {isPointerOnTrashButton} from '@/helpers/textTrashDropHitTest';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {StoryTextPill, type StoryTextPillHandle} from './StoryTextPill';
 import {TextLayerGestureSurface} from './TextLayerGestureSurface';
 import type {ExportMode} from '@/helpers/exportTypes';
-import {isPostLayoutMode} from '@/helpers/exportTypes';
 
 type Props = {
   exportMode: ExportMode;
@@ -92,10 +89,6 @@ export const TextContentOverlayArea = ({
   const [draggingLayerId, setDraggingLayerId] = useState<string | null>(null);
   const [isPointerOverTrash, setIsPointerOverTrash] = useState(false);
 
-  const closeTop = isPostLayoutMode(exportMode)
-    ? 'top-8 left-7'
-    : 'left-7 top-8';
-
   const dismissEmptyTextLayers = useCallback(() => {
     if (!attachmentId) return;
     pruneEmptyTextLayers(activeIndex, attachmentId);
@@ -129,12 +122,6 @@ export const TextContentOverlayArea = ({
       setActiveTextLayerId(activeIndex, attachmentId, null);
     }
     scheduleDismissEmptyTextLayers();
-  };
-
-  const handleClose = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    dismissEmptyTextLayers();
-    setActiveButton('editorMainMenu');
   };
 
   const selectLayer = useCallback(
@@ -245,13 +232,6 @@ export const TextContentOverlayArea = ({
         paddingBottom: `calc(24% + ${safeInsets.bottom + 10}px)`,
         paddingTop: `${safeInsets.top}px`,
       }}>
-      <button
-        type="button"
-        onClick={handleClose}
-        className={`absolute ${closeTop} z-1000 -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-100/20 bg-black/40 p-1 text-sm text-white hover:bg-black/80`}>
-        <FontAwesomeIcon icon={faXmark} size="lg" color="white" />
-      </button>
-
       <div className="relative h-full min-h-0 w-full max-w-full min-w-0 overflow-hidden">
         <div className="relative w-full max-w-full min-w-0 overflow-hidden">
           <div

@@ -1,5 +1,5 @@
 import {Canvas} from '@react-three/fiber';
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import type {MediaItem} from '../../hooks/useVerifiedMediaFiles';
 import {FilteredMedia} from './FilteredMedia';
 import {TextLayersCanvas} from './TextLayersCanvas';
@@ -38,6 +38,7 @@ export const MediaCanvas = ({
   media,
   index,
 }: Props): React.JSX.Element => {
+  const activeIndex = appStore(state => state.activeIndex);
   const adjustByIndex = appStore(state => state.adjustByIndex);
   const setCanvasSize = appStore(state => state.setCanvasSize);
 
@@ -49,21 +50,25 @@ export const MediaCanvas = ({
     adjustEntry?.id === id
       ? adjustEntry.value.bgColor
       : defaultAdjustTransform.bgColor;
-  const files = () => {
+
+  const fileProps = useMemo(() => {
     if (media) {
       return {uri: media.uri, width: media.width, height: media.height};
-    } else if (mediaList) {
+    }
+    if (mediaList?.[0]) {
       return {
         uri: mediaList[0].uri,
         width: mediaList[0].width,
         height: mediaList[0].height,
       };
-    } else {
-      return {uri: '', width: 1, height: 1};
     }
-  };
+    return {uri: '', width: 1, height: 1};
+  }, [media, mediaList]);
 
   useEffect(() => {
+    if (index !== activeIndex) {
+      return;
+    }
     if (
       containerSize &&
       containerSize.width !== 0 &&
@@ -71,7 +76,7 @@ export const MediaCanvas = ({
     ) {
       setCanvasSize(containerSize.width, containerSize.height);
     }
-  }, [containerSize, setCanvasSize]);
+  }, [containerSize, setCanvasSize, activeIndex, index]);
 
   return (
     <div
@@ -91,11 +96,11 @@ export const MediaCanvas = ({
         }}>
         <FilteredMedia
           id={id}
-          uri={files().uri}
+          uri={fileProps.uri}
           isVideo={video}
           aspectType={aspectType}
-          originalWidth={files().width}
-          originalHeight={files().height}
+          originalWidth={fileProps.width}
+          originalHeight={fileProps.height}
           fit={isPostLayoutMode(exportMode) ? 'cover' : 'contain'}
           videoRef={getVideoRef ? getVideoRef(index) : undefined}
           handleTap={() => (handleTap ? handleTap(index) : undefined)}
