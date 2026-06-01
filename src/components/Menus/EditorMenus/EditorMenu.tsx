@@ -179,10 +179,10 @@ export const EditorMenu = ({
     <>
       <style>{inlineStyle}</style>
       <footer
-        className={`fixed right-0 bottom-0 left-0 z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]`}
+        className={`fixed right-0 bottom-0 left-0 z-5000 flex h-[28%] flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]`}
         style={{
           backgroundColor: appColors.bottomMenuBackground,
-          paddingBottom: `${safeInsets.bottom + 10}px`,
+          paddingBottom: `${safeInsets.bottom + 25}px`,
         }}>
         <div className="flex items-center px-4 py-1">
           <button

@@ -61,7 +61,7 @@ export const EditorMenuMain = ({
       className="z-5000 flex h-[20%] flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
       style={{
         backgroundColor: appColors.bottomMenuBackground,
-        paddingBottom: `${safeInsets.bottom + 10}px`,
+        paddingBottom: `${safeInsets.bottom + 30}px`,
       }}>
       {/* Back button header */}
       <div className="flex items-center px-4 py-2">

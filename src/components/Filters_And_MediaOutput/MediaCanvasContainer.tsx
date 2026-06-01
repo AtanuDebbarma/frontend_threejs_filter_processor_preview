@@ -7,8 +7,8 @@ import {
   faPause,
   faVolumeXmark,
   faVolumeHigh,
-  faCircleUser,
 } from '@fortawesome/free-solid-svg-icons';
+import {MediaTagIcon} from './MediaTagIcon';
 import {Loader} from '@/components/shared/Loader';
 import {useActiveMediaIndex} from '../../hooks/useActiveMediaIndex';
 import {
@@ -207,18 +207,22 @@ export const MediaCanvasContainer = ({
     [togglePlayForIndex, buttonsOpen],
   );
 
-  // NEW: Effect to hide playerIconTapped after delay (like RN code)
+  // Hide playerIconTapped after delay (like RN code)
   useEffect(() => {
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
     Object.entries(playerIconTappedMap).forEach(([indexStr, tapped]) => {
       if (tapped) {
-        const index = parseInt(indexStr);
-        const timeout = setTimeout(() => {
-          setPlayerIconTappedMap(prev => ({...prev, [index]: false}));
-        }, 300); // Same as RN: 300ms
-
-        return () => clearTimeout(timeout);
+        const index = parseInt(indexStr, 10);
+        timeouts.push(
+          setTimeout(() => {
+            setPlayerIconTappedMap(prev => ({...prev, [index]: false}));
+          }, 300),
+        );
       }
     });
+    return () => {
+      timeouts.forEach(t => clearTimeout(t));
+    };
   }, [playerIconTappedMap]);
 
   // cleanup on unmount — read refs inside cleanup; don't put refs in deps
@@ -362,26 +366,8 @@ export const MediaCanvasContainer = ({
     }
   }, [activeIndex, mediaList, setTagMode]);
 
-  const RenderTagIcon = ({mediaIndex}: {mediaIndex: number}) => {
-    const media = mediaList[mediaIndex];
-    if (!media || media.mediaType === 'video') {
-      return null;
-    }
-
-    const handleIconPress = () => {
-      setTimeout(() => {
-        setTagMode(true);
-      }, 200);
-    };
-
-    return (
-      <button
-        onClick={() => handleIconPress()}
-        className="absolute bottom-2 left-2 z-500 rounded-full bg-white/40 text-white shadow-sm transition-opacity duration-180 active:opacity-50">
-        <FontAwesomeIcon icon={faCircleUser} size="lg" color="black" />
-      </button>
-    );
-  };
+  const showApplyingOnSlide = (slideIndex: number) =>
+    isApplyingFilter && storeActiveIndex === slideIndex;
 
   // Early return for loading state - kept as is
   if (!initialized || !mediaList.length) {
@@ -420,7 +406,11 @@ export const MediaCanvasContainer = ({
                 index={0}
               />
             )}
-            <RenderTagIcon mediaIndex={0} />
+            <MediaTagIcon
+              mediaIndex={0}
+              mediaList={mediaList}
+              onTagPress={() => setTagMode(true)}
+            />
             {/* UPDATED: Show button logic (like RN code) */}
             {(playerIconTappedMap[0] || !playingMap[0] || showButtonMap[0]) && (
               <div className="pointer-events-none absolute top-1/2 left-1/2 z-500 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/50 p-4 text-white hover:bg-black/80">
@@ -446,7 +436,7 @@ export const MediaCanvasContainer = ({
               />
             </button>
 
-            {isApplyingFilter && (
+            {showApplyingOnSlide(0) && (
               <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
                 <Loader
                   size={40}
@@ -473,9 +463,13 @@ export const MediaCanvasContainer = ({
                 index={0}
               />
             )}
-            <RenderTagIcon mediaIndex={0} />
+            <MediaTagIcon
+              mediaIndex={0}
+              mediaList={mediaList}
+              onTagPress={() => setTagMode(true)}
+            />
 
-            {isApplyingFilter && (
+            {showApplyingOnSlide(0) && (
               <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
                 <Loader
                   size={40}
@@ -525,7 +519,11 @@ export const MediaCanvasContainer = ({
                   />
                 )}
 
-                <RenderTagIcon mediaIndex={index} />
+                <MediaTagIcon
+                  mediaIndex={index}
+                  mediaList={mediaList}
+                  onTagPress={() => setTagMode(true)}
+                />
 
                 {/* UPDATED: Show button logic (like RN code) */}
                 {(playerIconTappedMap[index] ||
@@ -554,7 +552,7 @@ export const MediaCanvasContainer = ({
                   />
                 </button>
 
-                {isApplyingFilter && (
+                {showApplyingOnSlide(index) && (
                   <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
                     <Loader
                       size={40}
@@ -584,8 +582,12 @@ export const MediaCanvasContainer = ({
                     index={index}
                   />
                 )}
-                <RenderTagIcon mediaIndex={index} />
-                {isApplyingFilter && (
+                <MediaTagIcon
+                  mediaIndex={index}
+                  mediaList={mediaList}
+                  onTagPress={() => setTagMode(true)}
+                />
+                {showApplyingOnSlide(index) && (
                   <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
                     <Loader
                       size={40}

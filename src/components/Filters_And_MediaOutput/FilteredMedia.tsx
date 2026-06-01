@@ -14,7 +14,7 @@ import {
   clearExportFrameFeed,
   signalExportPipelineReady,
 } from '../../helpers/exportVideoFrameFeed';
-import {defaultEditor, type EditorRecord} from '../../store/editorSlice';
+import {defaultEditor} from '../../store/editorSlice';
 import {defaultAdjustTransform} from '../../store/adjustSlice';
 
 type Props = {
@@ -31,17 +31,18 @@ type Props = {
   index: number;
 };
 
-export const FilteredMedia = (props: Props): React.JSX.Element => {
+const FilteredMediaInner = (props: Props): React.JSX.Element => {
   const meshRef = useRef<THREE.Mesh | null>(null);
   const videoContainerRef = useRef<HTMLElement | null>(null);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
+  const slideIndex = props.index;
   const activeIndex = appStore(state => state.activeIndex);
-  const mediaFiles = appStore(state => state.mediaFiles);
-  const mediaIndex = props.index === activeIndex ? activeIndex : 0; // Sent from MediaCanvas
+  const isActiveSlide = slideIndex === activeIndex;
 
   const applyingStartRef = useRef<number | null>(null);
   const pendingClearRef = useRef<number | null>(null);
   const didSetApplyingRef = useRef<boolean>(false);
+  const colorBalanceVecRef = useRef(new THREE.Vector3());
   //  queue for textures that should be disposed only after render commit
   const toDisposeRef = useRef<THREE.Texture[]>([]);
   const exportVftRef = useRef<THREE.VideoFrameTexture | null>(null);
@@ -49,11 +50,11 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   const activeFilter = appStore(state => state.activeFilter);
   const setIsApplyingFilter = appStore(state => state.setIsApplyingFilter);
 
-  const editorByIndex: EditorRecord = appStore(state => state.editorByIndex);
-  const currentSelectedEditor =
-    editorByIndex[activeIndex].value ?? defaultEditor;
-  const currentSelectedID =
-    mediaFiles[mediaIndex].id === props.id ? props.id : '';
+  const currentSelectedEditor = appStore(
+    state => state.editorByIndex[slideIndex]?.value ?? defaultEditor,
+  );
+  const fileIdAtIndex = appStore(state => state.mediaFiles[slideIndex]?.id);
+  const currentSelectedID = fileIdAtIndex === props.id ? props.id : '';
 
   const brightness = currentSelectedEditor.brightness ?? 0.0;
   const contrast = currentSelectedEditor.contrast ?? 1.0;
@@ -70,14 +71,33 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
   const highlights = currentSelectedEditor.highlights ?? 0.0;
   const temperature = currentSelectedEditor.temperature ?? 0.0;
   const blur = currentSelectedEditor.blur ?? 0.0;
-  const adjustByIndex = appStore(state => state.adjustByIndex);
+  const adjustEntry = appStore(state => state.adjustByIndex[slideIndex]);
   const isSaveExporting = appStore(state => state.isSaveExporting);
   const isPostExporting = appStore(state => state.isPostExporting);
   const isVideoPipelineExporting = isSaveExporting || isPostExporting;
   const adjustTransform =
-    adjustByIndex[mediaIndex].id === props.id
-      ? adjustByIndex[mediaIndex].value
-      : defaultAdjustTransform;
+    adjustEntry?.id === props.id ? adjustEntry.value : defaultAdjustTransform;
+
+  const beginApplyingIfActive = async (): Promise<void> => {
+    if (appStore.getState().activeIndex !== slideIndex) {
+      return;
+    }
+    try {
+      await setIsApplyingFilter(true);
+      didSetApplyingRef.current = true;
+      applyingStartRef.current = Date.now();
+      if (pendingClearRef.current) {
+        window.clearTimeout(pendingClearRef.current);
+        pendingClearRef.current = null;
+      }
+    } catch (e) {
+      rnLogger.componentLog(
+        'FilteredMedia',
+        'error',
+        `Failed to set applying flag: ${e}`,
+      );
+    }
+  };
 
   const isRNLocalUrl = (url: string) =>
     url.startsWith('file:') ||
@@ -232,25 +252,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     // image path: create texture immediately
     if (!props.isVideo) {
       // start "applying / loading" flag
-      void (async () => {
-        try {
-          await setIsApplyingFilter(true);
-          didSetApplyingRef.current = true;
-          applyingStartRef.current = Date.now();
-
-          // cancel any previously scheduled clear (we're starting a new apply)
-          if (pendingClearRef.current) {
-            window.clearTimeout(pendingClearRef.current);
-            pendingClearRef.current = null;
-          }
-        } catch (e) {
-          rnLogger.componentLog(
-            'FilteredMedia',
-            'error',
-            `Failed to set applying flag: ${e}`,
-          );
-        }
-      })();
+      void beginApplyingIfActive();
       const loader = new THREE.TextureLoader();
       const tex = loader.load(
         props.uri,
@@ -397,22 +399,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
 
     // metadata handler: create VideoTexture once we have dimensions
     const onMetadata = async () => {
-      try {
-        await setIsApplyingFilter(true);
-        didSetApplyingRef.current = true;
-        applyingStartRef.current = Date.now();
-
-        if (pendingClearRef.current) {
-          window.clearTimeout(pendingClearRef.current);
-          pendingClearRef.current = null;
-        }
-      } catch (e) {
-        rnLogger.componentLog(
-          'FilteredMedia',
-          'warn',
-          `Failed to set applying flag on video metadata: ${e}`,
-        );
-      }
+      await beginApplyingIfActive();
 
       try {
         const vt = new THREE.VideoTexture(videoEl);
@@ -530,6 +517,9 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
 
   useFrame(() => {
     if (isVideoPipelineExporting && props.isVideo) {
+      return;
+    }
+    if (!isActiveSlide) {
       return;
     }
 
@@ -778,18 +768,24 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     const {csVal, rangeVal} = resolveColorSpaceAndRange(activeFilter);
 
     const merged = {
-      brightness: brightness ?? p.brightness ?? 0.0,
-      contrast: contrast ?? p.contrast ?? 1.0,
-      saturation: saturation ?? p.saturation ?? 1.0,
-      gamma: gamma ?? p.gamma ?? 1.0,
-      hue: hue ?? p.hue ?? 0.0,
-      colorBalance: colorBalance ?? p.colorBalance ?? {r: 0, g: 0, b: 0},
-      unsharpAmount: sharpness ?? p.unsharp?.amount ?? 0.0,
-      shadows: shadows ?? p.shadows ?? 0.0,
-      highlights: highlights ?? p.highlights ?? 0.0,
-      temperature: temperature ?? p.temperature ?? 0.0,
-      blur: blur ?? p.blur ?? 0.0,
+      brightness: p.brightness ?? 0.0,
+      contrast: p.contrast ?? 1.0,
+      saturation: p.saturation ?? 1.0,
+      gamma: p.gamma ?? 1.0,
+      hue: p.hue ?? 0.0,
+      colorBalance: p.colorBalance ?? {r: 0, g: 0, b: 0},
+      unsharpAmount: p.unsharp?.amount ?? 0.0,
+      shadows: p.shadows ?? 0.0,
+      highlights: p.highlights ?? 0.0,
+      temperature: p.temperature ?? 0.0,
+      blur: p.blur ?? 0.0,
     };
+
+    colorBalanceVecRef.current.set(
+      merged.colorBalance.r ?? 0,
+      merged.colorBalance.g ?? 0,
+      merged.colorBalance.b ?? 0,
+    );
 
     const uniforms: any = {
       tDiffuse: {value: mediaTextureState},
@@ -797,13 +793,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
       contrast: {value: merged.contrast},
       saturation: {value: merged.saturation},
       gammaVal: {value: merged.gamma},
-      colorBalance: {
-        value: new THREE.Vector3(
-          merged.colorBalance.r ?? 0,
-          merged.colorBalance.g ?? 0,
-          merged.colorBalance.b ?? 0,
-        ),
-      },
+      colorBalance: {value: colorBalanceVecRef.current},
       hue: {value: (merged.hue * Math.PI) / 180.0},
       unsharpAmount: {value: merged.unsharpAmount},
       shadows: {value: merged.shadows},
@@ -832,6 +822,7 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     shaderMat.name = 'ParamsShaderMaterial';
     materialRef.current = shaderMat;
     return shaderMat;
+    // size.width/height: u_texel updated in useEffect below (avoid material rebuild on resize)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     mediaTextureState,
@@ -839,19 +830,6 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     curveTexture,
     curvePresent,
     resolveColorSpaceAndRange,
-    brightness,
-    contrast,
-    saturation,
-    gamma,
-    hue,
-    colorBalance?.r,
-    colorBalance?.g,
-    colorBalance?.b,
-    sharpness,
-    shadows,
-    highlights,
-    temperature,
-    blur,
   ]);
   // keep material texture uniform updated when mediaTextureState changes
   useEffect(() => {
@@ -952,11 +930,12 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     mat.uniforms.contrast.value = merged.contrast;
     mat.uniforms.saturation.value = merged.saturation;
     mat.uniforms.gammaVal.value = merged.gamma;
-    mat.uniforms.colorBalance.value = new THREE.Vector3(
+    colorBalanceVecRef.current.set(
       merged.colorBalance.r ?? 0,
       merged.colorBalance.g ?? 0,
       merged.colorBalance.b ?? 0,
     );
+    mat.uniforms.colorBalance.value = colorBalanceVecRef.current;
     mat.uniforms.hue.value = (merged.hue * Math.PI) / 180.0;
     mat.uniforms.unsharpAmount.value = merged.unsharpAmount;
     mat.uniforms.shadows.value = merged.shadows;
@@ -1197,6 +1176,8 @@ export const FilteredMedia = (props: Props): React.JSX.Element => {
     </mesh>
   );
 };
+
+export const FilteredMedia = React.memo(FilteredMediaInner);
 
 /*
  * @displayName FilteredMedia

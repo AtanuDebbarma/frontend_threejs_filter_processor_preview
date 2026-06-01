@@ -132,10 +132,12 @@ void main() {
   vec4 raw = texture2D(tDiffuse, vUv);
   vec3 srcEnc = raw.rgb;
 
-  // compute a blurred sample from the same source (encoded-space)
-  // radius mapping: 1.0 + blur * 6.0 (tune this multiplier to taste)
-  float radius = 1.0 + clamp(blur, 0.0, 1.0) * 6.0;
-  vec3 blurEnc = boxBlur(tDiffuse, vUv, u_texel, radius);
+  // Blur sample — skip 9-tap when neither blur mix nor unsharp needs it
+  vec3 blurEnc = srcEnc;
+  if (blur > 0.01 || unsharpAmount > 0.0001) {
+    float radius = 1.0 + clamp(blur, 0.0, 1.0) * 6.0;
+    blurEnc = boxBlur(tDiffuse, vUv, u_texel, radius);
+  }
 
   // if input is limited range, expand both samples first
   if (u_inputRange > 0.5) {

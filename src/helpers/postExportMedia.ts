@@ -4,9 +4,8 @@
  * **F2 (active slide / editor uniforms):** Before each capture we call
  * `setActiveIndex(item.index)` and wait for the export renderer to settle
  * (`invalidate()` + double `requestAnimationFrame`). `FilteredMedia` reads
- * `editorByIndex[activeIndex]`; aligning store `activeIndex` with the slide
- * under export avoids wrong filter/adjust on non-active slides. If this proves
- * flaky on device, refactor `FilteredMedia` to use `editorByIndex[props.index]`.
+ * `editorByIndex[props.index]` per slide. `setActiveIndex` before each encode
+ * still scrolls the carousel and triggers `invalidate()` on the correct canvas.
  *
  * **Order (v1):** encode(i) → upload(i) → EXPORT_SUCCESS(i) → release Blob → next.
  */
