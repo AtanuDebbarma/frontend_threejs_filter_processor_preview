@@ -338,10 +338,10 @@ export const TextMenu = ({appColors, safeInsets}: Props): React.JSX.Element => {
 
   return (
     <footer
-      className="relative z-5000 flex h-[28%] flex-col overflow-visible rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
+      className="relative z-5000 flex h-[20%] flex-col overflow-visible rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
       style={{
         backgroundColor: appColors.bottomMenuBackground,
-        paddingBottom: `${safeInsets.bottom + 38}px`,
+        paddingBottom: `${safeInsets.bottom + 10}px`,
       }}>
       <div className="flex items-center px-4 py-2">
         <button
