@@ -152,7 +152,7 @@ export const FilterMenu = ({
 
   return (
     <footer
-      className="z-5000 flex h-[28%] flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
+      className="z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
       style={{
         backgroundColor: appColors.bottomMenuBackground,
         paddingBottom: `${safeInsets.bottom + 10}px`,
@@ -167,7 +167,7 @@ export const FilterMenu = ({
         </button>
       </div>
 
-      <div className="-mt-4 flex h-full w-full flex-col">
+      <div className="-mt-4 flex w-full flex-col">
         <div className="w-full pt-0 pb-3 text-center">
           <h3
             className="text-lg font-medium"

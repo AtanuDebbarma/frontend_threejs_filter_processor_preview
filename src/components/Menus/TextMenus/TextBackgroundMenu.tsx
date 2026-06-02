@@ -180,12 +180,13 @@ export const TextBackgroundMenu = ({
 
   return (
     <footer
-      className="z-5000 flex h-[24%] flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
+      className={`fixed right-0 bottom-0 left-0 z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]`}
       style={{
         backgroundColor: appColors.bottomMenuBackground,
         paddingBottom: `${safeInsets.bottom + 10}px`,
       }}>
-      <div className="flex items-center px-4 py-2">
+      {/* Back button header */}
+      <div className="flex items-center px-4 py-1">
         <button
           onClick={handleBack}
           className="flex items-center gap-1 text-orange-600 transition-opacity duration-180 active:opacity-50">
@@ -193,7 +194,7 @@ export const TextBackgroundMenu = ({
           <span className="text-sm font-medium">Back</span>
         </button>
       </div>
-      <div className="pb-5 text-center">
+      <div className="pt-[-1rem] pb-4 text-center">
         <h3
           className="text-md font-medium"
           style={{
@@ -203,7 +204,7 @@ export const TextBackgroundMenu = ({
         </h3>
       </div>
       <div
-        className="scrollbar-hide mx-2 flex overflow-x-auto"
+        className="scrollbar-hide mx-2 mb-5 flex overflow-x-auto"
         style={{WebkitOverflowScrolling: 'touch'}}>
         {modeButtons.map(({id, label}) => {
           const isSelected = selectedMode === id;

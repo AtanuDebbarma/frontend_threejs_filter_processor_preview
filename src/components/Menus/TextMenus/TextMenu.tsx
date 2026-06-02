@@ -338,12 +338,13 @@ export const TextMenu = ({appColors, safeInsets}: Props): React.JSX.Element => {
 
   return (
     <footer
-      className="relative z-5000 flex h-[20%] flex-col overflow-visible rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
+      className={`fixed right-0 bottom-0 left-0 z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]`}
       style={{
         backgroundColor: appColors.bottomMenuBackground,
         paddingBottom: `${safeInsets.bottom + 10}px`,
       }}>
-      <div className="flex items-center px-4 py-2">
+      {/* Back button header */}
+      <div className="flex items-center px-4 py-1">
         <button
           onClick={handleBack}
           className="flex items-center gap-1 text-orange-600 transition-opacity duration-180 active:opacity-50">
@@ -351,8 +352,7 @@ export const TextMenu = ({appColors, safeInsets}: Props): React.JSX.Element => {
           <span className="text-sm font-medium">Back</span>
         </button>
       </div>
-
-      <div className={'pb-4 text-center'}>
+      <div className="pt-[-1.8rem] pb-2 text-center">
         <h3
           className="text-md font-medium"
           style={{
@@ -363,7 +363,7 @@ export const TextMenu = ({appColors, safeInsets}: Props): React.JSX.Element => {
       </div>
 
       <div
-        className={`flex flex-row items-stretch overflow-x-auto px-2 pt-2 pb-5 text-sm font-medium ${
+        className={`flex flex-row items-center overflow-x-auto px-2 pt-2 pb-5 text-sm font-medium ${
           hasTextLayers ? '' : 'justify-center'
         }`}
         style={{
@@ -396,24 +396,13 @@ export const TextMenu = ({appColors, safeInsets}: Props): React.JSX.Element => {
                 }
                 handleButtonToggle(button, e);
               }}
-              className={`mx-1.5 h-18 min-w-30 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-3 shadow-sm transition-opacity duration-180 active:opacity-50 disabled:opacity-40 ${
-                hasTextLayers ? 'flex-1' : 'w-40'
-              }`}
+              className="mx-1.5 flex w-32 shrink-0 flex-col items-center gap-1.5 rounded-lg border border-gray-300 px-2 py-3 shadow-sm transition-opacity duration-180 active:opacity-50 disabled:opacity-40"
               style={{
                 color: appColors.textColor,
                 backgroundColor: appColors.buttonColor,
               }}>
               <FontAwesomeIcon icon={icon} size="lg" />
-              <span
-                className="font-md mt-1 w-full text-center text-sm leading-tight"
-                style={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  height: '2.5em',
-                  minHeight: '2.5em',
-                }}>
+              <span className="text-xs text-nowrap">
                 {label}
                 {isAddText && layerCount > 0
                   ? ` (${layerCount}/${MAX_TEXT_LAYERS_PER_SLIDE})`
