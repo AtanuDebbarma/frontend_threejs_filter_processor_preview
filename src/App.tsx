@@ -218,7 +218,7 @@ const App = (): React.JSX.Element => {
   //       textColor: 'rgba(0, 0, 0, 1)',
   //       buttonColor: 'rgba(217, 217, 217, 1)',
   //     },
-  //     insets: {top: 0, bottom: 0, left: 0, right: 0},
+  //     insets: {top: 0, bottom: 10, left: 0, right: 0},
   //     production: false,
   //   };
 
