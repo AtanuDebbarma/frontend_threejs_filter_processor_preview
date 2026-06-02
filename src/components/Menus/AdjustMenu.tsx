@@ -1,5 +1,5 @@
 // src/components/Menus/AdjustMenu.tsx
-import React, {useEffect, useState, useRef, useMemo} from 'react';
+import React, {useCallback, useEffect, useRef, useState, useMemo} from 'react';
 import {LazySketchColorPicker} from '@/components/shared/LazySketchColorPicker';
 import {useThrottledHexCommit} from '@/hooks/useThrottledHexCommit';
 import {appStore} from '../../store/appStore';
@@ -7,7 +7,8 @@ import {faXmark} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {useGesture} from '@use-gesture/react';
 import {useAdjustPreviewLayout} from '../../hooks/useAdjustPreviewLayout';
-import {AdjustPreviewFrame} from './shared/AdjustPreviewFrame';
+import {useMenuPreviewVideo} from '@/hooks/useMenuPreviewVideo';
+import {Loader} from '@/components/shared/Loader';
 import {
   defaultAdjustTransform,
   type AdjustRecord,
@@ -48,6 +49,8 @@ export const AdjustMenu = ({
   const [isTagSelectionLocked, setIsTagSelectionLocked] = useState(false);
 
   const activeFile = mediaFiles[activeIndex];
+
+  // Single ref that points at whatever media element is rendered (img or video)
   const mediaRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
   const tagSelectionTimeoutRef = useRef<any | null>(null);
 
@@ -55,11 +58,25 @@ export const AdjustMenu = ({
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
 
-  const {displayScale, previewRef} = useAdjustPreviewLayout(
+  // Layout: displayScale maps media-pixel offsets → preview-pixel offsets, baseFitScale fits media into preview box
+  const {displayScale, baseFitScale, previewRef} = useAdjustPreviewLayout(
     exportMode,
     activeIndex,
   );
 
+  // Video: seek-to-time preview with poster/frame-ready states; photo: just uri
+  const {
+    isVideo,
+    photoUri,
+    videoSrc,
+    posterSrc,
+    isLoading,
+    isFrameReady,
+    videoCrossOrigin,
+    bindMenuPreviewVideo,
+  } = useMenuPreviewVideo(activeIndex);
+
+  // Restore committed store values into local state when menu opens / index changes
   useEffect(() => {
     if (
       activeIndex !== null &&
@@ -79,16 +96,13 @@ export const AdjustMenu = ({
 
   const isPhotoSlide = activeFile?.mediaType === 'photo';
 
-  const adjustPreviewTransform = useMemo(
-    () => ({
-      positionX: position.x,
-      positionY: position.y,
-      scale,
-      rotation,
-      bgColor: localBgColor,
-    }),
-    [position.x, position.y, scale, rotation, localBgColor],
-  );
+  // Tag mode is photo-only
+  useEffect(() => {
+    if (activeFile?.mediaType === 'video' && tagMode) {
+      setTagMode(false);
+    }
+  }, [activeFile?.mediaType, activeFile?.id, tagMode, setTagMode]);
+
   const {
     onChange: handleAdjustBgColorChange,
     flushPending: flushAdjustBgColor,
@@ -96,13 +110,20 @@ export const AdjustMenu = ({
     setLocalBgColor(hex);
   });
 
-  useEffect(() => {
-    if (activeFile?.mediaType === 'video' && tagMode) {
-      setTagMode(false);
-    }
-  }, [activeFile?.mediaType, activeFile?.id, tagMode, setTagMode]);
+  // Assign video element to both bindMenuPreviewVideo (for seeking) and mediaRef (for gestures)
+  const setVideoRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      bindMenuPreviewVideo(el);
+      (mediaRef as React.RefObject<HTMLVideoElement | null>).current = el;
+    },
+    [bindMenuPreviewVideo],
+  );
 
-  // Listen for messages from React Native
+  const setImageRef = useCallback((el: HTMLImageElement | null) => {
+    (mediaRef as React.RefObject<HTMLImageElement | null>).current = el;
+  }, []);
+
+  // Listen for TAG_SEARCH_RESULT messages from React Native
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       try {
@@ -113,30 +134,20 @@ export const AdjustMenu = ({
           rnLogger.componentLog(
             'AdjustMenu',
             'log',
-            `Tag search result payload: ${JSON.stringify(
-              data.payload,
-              null,
-              2,
-            )}`,
+            `Tag search result payload: ${JSON.stringify(data.payload, null, 2)}`,
           );
 
-          // If tag search was cancelled or invalid — remove it
           if (!userId || !username) {
             removeTagAtIndex(activeIndex, currentActiveId, tagId);
             handleManualCancel(assetId, tagId);
             return;
           }
 
-          // Otherwise update the tag with real user data
           const tag = tagValuesByIndex[activeIndex].tags?.find(
             t => t.id === tagId && tagValuesByIndex[activeIndex].id === assetId,
           );
           if (tag) {
-            addTagToIndex(activeIndex, assetId, {
-              ...tag,
-              userId,
-              username,
-            });
+            addTagToIndex(activeIndex, assetId, {...tag, userId, username});
           }
         }
       } catch (err) {
@@ -148,7 +159,6 @@ export const AdjustMenu = ({
       }
     };
     document.addEventListener('message', handleMessage as any);
-
     return () => document.removeEventListener('message', handleMessage as any);
   }, [
     activeIndex,
@@ -158,7 +168,7 @@ export const AdjustMenu = ({
     currentActiveId,
   ]);
 
-  // Gesture binding with @use-gesture/react
+  // Gesture target is mediaRef — lives in the same component, no child re-render hop
   useGesture(
     {
       onDrag: !tagMode
@@ -179,11 +189,10 @@ export const AdjustMenu = ({
         tagMode && !isModalOpen && isPhotoSlide
           ? ({event}) => {
               if (!previewRef.current || isTagSelectionLocked) return;
-
               // ✅ Double check modal isn't open
               if (isModalOpen) return;
 
-              // Lock tag selection for 200ms
+              // Lock tag selection for 300ms
               setIsTagSelectionLocked(true);
               if (tagSelectionTimeoutRef.current) {
                 clearTimeout(tagSelectionTimeoutRef.current);
@@ -206,18 +215,17 @@ export const AdjustMenu = ({
                   existingTags.id === currentActiveId
                     ? Math.max(...existingTags.tags.map(t => t.z ?? 0))
                     : 0;
-                const zIndex = maxZ + 1; // ✅ define z here
+                const zIndex = maxZ + 1;
 
                 addTagToIndex(activeIndex, currentActiveId, {
                   id: tagId,
-                  x: x,
-                  y: y,
-                  z: zIndex, // to be fixed
+                  x,
+                  y,
+                  z: zIndex,
                   username: '',
                   userId: '',
                 });
 
-                // Send message to React Native
                 if (window.ReactNativeWebView) {
                   window.ReactNativeWebView.postMessage(
                     JSON.stringify({
@@ -226,7 +234,7 @@ export const AdjustMenu = ({
                         tagId,
                         x,
                         y,
-                        zIndex: zIndex,
+                        zIndex,
                         mediaIndex: activeIndex,
                         mediaID: currentActiveId,
                       },
@@ -288,12 +296,11 @@ export const AdjustMenu = ({
       setAdjustTransform(activeIndex, currentActiveId, {
         x: position.x / activeFile.width,
         y: position.y / activeFile.height,
-        scale: scale,
-        rotation: rotation,
+        scale,
+        rotation,
         bgColor: localBgColor,
       });
     }
-
     setTimeout(() => {
       changeButton();
     }, 200);
@@ -304,36 +311,123 @@ export const AdjustMenu = ({
       window.ReactNativeWebView.postMessage(
         JSON.stringify({
           type: 'TAG_SEARCH_CANCEL',
-          payload: {
-            tagId,
-            mediaId: activeID,
-          },
+          payload: {tagId, mediaId: activeID},
         }),
       );
     }
   };
 
-  const closeTop = `${isPostLayoutMode(exportMode) ? 'top-8 left-7' : 'left-7 top-8'}`;
+  // Shared CSS transform applied to the media element during drag — computed inline
+  // so the gesture → state → same-component render path is as short as possible.
+  const mediaTransformStyle = useMemo(
+    (): React.CSSProperties => ({
+      maxWidth: 'none',
+      maxHeight: 'none',
+      transform: `
+        translate(${position.x / displayScale.x}px, ${position.y / displayScale.y}px)
+        scale(${baseFitScale * scale})
+        rotate(${rotation}deg)
+      `,
+      transformOrigin: 'center center',
+      touchAction: 'none',
+    }),
+    [
+      position.x,
+      position.y,
+      displayScale.x,
+      displayScale.y,
+      baseFitScale,
+      scale,
+      rotation,
+    ],
+  );
+
+  const aspect = isPostLayoutMode(exportMode) ? 'aspect-4/5' : 'aspect-9/16';
+  const closeTop = isPostLayoutMode(exportMode)
+    ? 'top-8 left-7'
+    : 'left-7 top-8';
+  const showVideoSpinner = isVideo && isLoading && !posterSrc && !isFrameReady;
 
   return (
     <div
       className="absolute right-0 bottom-0 left-0 z-5000 h-full rounded-lg bg-[rgba(0,0,0,0.8)] px-0 backdrop-blur-lg"
       onClick={() => setShowColorPicker(false)}
-      style={{
-        paddingBottom: `${safeInsets.bottom + 10}px`,
-      }}>
+      style={{paddingBottom: `${safeInsets.bottom + 10}px`}}>
       <button
         onClick={handleBack}
         className={`absolute ${closeTop} z-1000 -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-100/20 bg-black/40 p-1 text-sm text-white hover:bg-black/80`}>
         <FontAwesomeIcon icon={faXmark} size="lg" color="white" />
       </button>
 
-      <AdjustPreviewFrame
-        exportMode={exportMode}
-        activeIndex={activeIndex}
-        transform={adjustPreviewTransform}
-        mediaRef={mediaRef}>
-        {/* Position tags — images only (not video adjust preview) */}
+      {/* Preview box — media lives here directly, gesture target is mediaRef */}
+      <div
+        ref={previewRef}
+        className={`relative flex w-full items-center justify-center overflow-hidden rounded-lg border ${aspect}`}
+        style={{backgroundColor: localBgColor}}>
+        <div className="flex h-full w-full items-center justify-center">
+          {activeFile ? (
+            isVideo ? (
+              <>
+                {showVideoSpinner ? <Loader size={30} color="#FF4800" /> : null}
+                {/* Poster: snapshot from export video element — shown while video seeks */}
+                {posterSrc ? (
+                  <img
+                    ref={setImageRef}
+                    src={posterSrc}
+                    alt="video preview frame"
+                    className="touch-none select-none"
+                    style={mediaTransformStyle}
+                    draggable={false}
+                  />
+                ) : null}
+                {/* Seekable video element — fades in once frame is ready */}
+                {videoSrc ? (
+                  <video
+                    ref={setVideoRef}
+                    src={videoSrc}
+                    muted
+                    playsInline
+                    preload="auto"
+                    controls={false}
+                    disablePictureInPicture
+                    crossOrigin={videoCrossOrigin}
+                    aria-label="Video preview frame"
+                    className="touch-none select-none"
+                    style={{
+                      ...mediaTransformStyle,
+                      opacity: isFrameReady ? 1 : 0,
+                    }}
+                    draggable={false}
+                    onLoadedMetadata={e =>
+                      bindMenuPreviewVideo(e.currentTarget)
+                    }
+                    onLoadedData={e => bindMenuPreviewVideo(e.currentTarget)}
+                    onError={ev => {
+                      rnLogger.componentLog(
+                        'AdjustMenu',
+                        'error',
+                        `Menu preview video error: ${ev}`,
+                      );
+                    }}
+                  />
+                ) : null}
+              </>
+            ) : (
+              <img
+                ref={setImageRef}
+                src={photoUri}
+                alt="image preview"
+                className="touch-none select-none"
+                style={mediaTransformStyle}
+                draggable={false}
+              />
+            )
+          ) : (
+            <p className="text-white">No media</p>
+          )}
+        </div>
+
+        {/* Position tags — photos only */}
         {isPhotoSlide &&
           tagValuesByIndex[activeIndex].tags?.map(tag => (
             <div
@@ -361,7 +455,7 @@ export const AdjustMenu = ({
               </button>
             </div>
           ))}
-      </AdjustPreviewFrame>
+      </div>
 
       {!tagMode && (
         <>

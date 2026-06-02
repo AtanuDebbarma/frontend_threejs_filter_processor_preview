@@ -14,7 +14,6 @@ type Props = {
   activeIndex: number;
   transform: AdjustPreviewMediaTransform;
   children?: React.ReactNode;
-  mediaRef?: React.RefObject<HTMLImageElement | HTMLVideoElement | null>;
   fromText?: boolean;
   /** Text flow: show trash drop target only while dragging a layer. */
   showTextTrashDropZone?: boolean;
@@ -24,15 +23,14 @@ type Props = {
 };
 
 /**
- * Shared 4:5 / 9:16 preview box — same layout + media CSS transform as AdjustMenu.
- * Videos: non-playable <video> seeked to stored playback time (see useMenuPreviewVideo).
+ * Preview box used by the Text flow — 4:5 / 9:16 aspect, media seeked to stored
+ * playback time. Not used by AdjustMenu (which renders media inline for fast drag).
  */
 export const AdjustPreviewFrame = ({
   exportMode,
   activeIndex,
   transform,
   children,
-  mediaRef,
   fromText = false,
   showTextTrashDropZone = false,
   isTextTrashHot = false,
@@ -52,25 +50,11 @@ export const AdjustPreviewFrame = ({
     bindMenuPreviewVideo,
   } = useMenuPreviewVideo(activeIndex);
 
-  const assignMediaRef = useCallback(
-    (el: HTMLImageElement | HTMLVideoElement | null) => {
-      if (mediaRef) {
-        (
-          mediaRef as React.RefObject<
-            HTMLImageElement | HTMLVideoElement | null
-          >
-        ).current = el;
-      }
-    },
-    [mediaRef],
-  );
-
   const setVideoRef = useCallback(
     (el: HTMLVideoElement | null) => {
       bindMenuPreviewVideo(el);
-      assignMediaRef(el);
     },
-    [bindMenuPreviewVideo, assignMediaRef],
+    [bindMenuPreviewVideo],
   );
 
   const mediaTransformStyle: React.CSSProperties = {
@@ -100,9 +84,6 @@ export const AdjustPreviewFrame = ({
               {showVideoSpinner ? <Loader size={30} color="#FF4800" /> : null}
               {posterSrc ? (
                 <img
-                  ref={el => {
-                    assignMediaRef(el);
-                  }}
                   src={posterSrc}
                   alt="video preview frame"
                   className="touch-none select-none"
@@ -145,9 +126,6 @@ export const AdjustPreviewFrame = ({
             </>
           ) : (
             <img
-              ref={el => {
-                assignMediaRef(el);
-              }}
               src={photoUri}
               alt="image preview"
               className="touch-none select-none"
