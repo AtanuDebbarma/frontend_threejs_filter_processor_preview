@@ -61,6 +61,8 @@ export const useTextLayerGestures = ({
   const transformRef = useRef(transform);
   const stageWRef = useRef(stageWidthPx);
   const stageHRef = useRef(stageHeightPx);
+  // Track active gesture type so drag and pinch never run simultaneously
+  const activeGestureRef = useRef<'drag' | 'pinch' | null>(null);
 
   useLayoutEffect(() => {
     transformRef.current = transform;
@@ -70,10 +72,21 @@ export const useTextLayerGestures = ({
 
   useGesture(
     {
-      onDragStart: () => {
+      onDragStart: ({touches}) => {
+        // Only start drag when exactly 1 touch — let pinch own 2-finger sequences
+        if (touches > 1) return;
+        if (activeGestureRef.current === 'pinch') return;
+        activeGestureRef.current = 'drag';
         onDragStart?.();
       },
-      onDrag: ({offset: [px, py], event}) => {
+      onDrag: ({offset: [px, py], event, touches, cancel}) => {
+        // If a second finger arrives mid-drag, cancel drag and let pinch take over
+        if (touches > 1) {
+          cancel();
+          activeGestureRef.current = null;
+          return;
+        }
+        if (activeGestureRef.current !== 'drag') return;
         onTransform(
           textTransformFromDragOffset(
             transformRef.current,
@@ -86,15 +99,28 @@ export const useTextLayerGestures = ({
         onDrag?.(pointerFromEvent(event));
       },
       onDragEnd: ({event}) => {
+        if (activeGestureRef.current === 'drag') {
+          activeGestureRef.current = null;
+        }
         onDragEnd?.(pointerFromEvent(event));
       },
-      onPinchStart: () => {
+      onPinchStart: ({touches}) => {
+        // Only start pinch with 2 touches
+        if (touches < 2) return;
+        if (activeGestureRef.current === 'drag') return;
+        activeGestureRef.current = 'pinch';
         onPinchStart?.();
       },
       onPinch: ({offset: [scale, rotation]}) => {
+        if (activeGestureRef.current !== 'pinch') return;
         onTransform(
           textTransformFromPinchOffset(transformRef.current, scale, rotation),
         );
+      },
+      onPinchEnd: () => {
+        if (activeGestureRef.current === 'pinch') {
+          activeGestureRef.current = null;
+        }
       },
     },
     {
@@ -110,6 +136,10 @@ export const useTextLayerGestures = ({
             stageHRef.current,
           ),
         filterTaps: true,
+        // Require meaningful movement before drag starts — prevents accidental drags on tap
+        threshold: 4,
+        // Only activate drag on single pointer
+        pointerLength: 1,
       },
       pinch: {
         from: () => [transformRef.current.scale, transformRef.current.rotation],
