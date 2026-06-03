@@ -338,7 +338,7 @@ export const TextMenu = ({appColors, safeInsets}: Props): React.JSX.Element => {
 
   return (
     <footer
-      className={`fixed right-0 bottom-0 left-0 z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]`}
+      className="z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
       style={{
         backgroundColor: appColors.bottomMenuBackground,
         paddingBottom: `${safeInsets.bottom + 10}px`,
@@ -352,7 +352,7 @@ export const TextMenu = ({appColors, safeInsets}: Props): React.JSX.Element => {
           <span className="text-sm font-medium">Back</span>
         </button>
       </div>
-      <div className="pt-[-1.8rem] pb-2 text-center">
+      {/* <div className="pt-[-1.8rem] pb-2 text-center">
         <h3
           className="text-md font-medium"
           style={{
@@ -360,7 +360,7 @@ export const TextMenu = ({appColors, safeInsets}: Props): React.JSX.Element => {
           }}>
           Text Options
         </h3>
-      </div>
+      </div> */}
 
       <div
         className={`flex flex-row items-center overflow-x-auto px-2 pt-2 pb-5 text-sm font-medium ${
