@@ -227,26 +227,20 @@ export const TextContentOverlayArea = ({
 
   return (
     <div
-      className="pointer-events-auto absolute inset-0 z-4000 max-w-full overflow-hidden rounded-lg bg-[rgba(0,0,0,0.8)] px-0 backdrop-blur-lg"
-      style={{
-        paddingBottom: `calc(24% + ${safeInsets.bottom + 10}px)`,
-        paddingTop: `${safeInsets.top}px`,
-      }}>
+      className="pointer-events-auto absolute inset-0 z-4000 h-full max-w-full overflow-hidden rounded-lg bg-[rgba(0,0,0,0.8)] px-0 backdrop-blur-lg"
+      style={{paddingBottom: `${safeInsets.bottom + 10}px`}}>
       <div className="relative h-full min-h-0 w-full max-w-full min-w-0 overflow-hidden">
-        <div className="relative w-full max-w-full min-w-0 overflow-hidden">
-          <div
-            className="relative w-full max-w-full min-w-0"
-            onPointerDown={handlePreviewPointerDown}>
-            <AdjustPreviewFrame
-              exportMode={exportMode}
-              activeIndex={activeIndex}
-              transform={previewTransform}
-              fromText={true}
-              showTextTrashDropZone={isTextDragActive}
-              isTextTrashHot={isTextDragActive && isPointerOverTrash}
-              textTrashButtonRef={textTrashButtonRef}
-            />
-          </div>
+        <div
+          className="relative w-full max-w-full min-w-0"
+          onPointerDown={handlePreviewPointerDown}>
+          <AdjustPreviewFrame
+            exportMode={exportMode}
+            activeIndex={activeIndex}
+            transform={previewTransform}
+            showTextTrashDropZone={isTextDragActive}
+            isTextTrashHot={isTextDragActive && isPointerOverTrash}
+            textTrashButtonRef={textTrashButtonRef}
+          />
           <div
             ref={textStageRef}
             className="pointer-events-none absolute inset-0 z-30 overflow-hidden">

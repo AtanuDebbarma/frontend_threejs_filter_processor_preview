@@ -13,25 +13,22 @@ type Props = {
   exportMode: ExportMode;
   activeIndex: number;
   transform: AdjustPreviewMediaTransform;
-  children?: React.ReactNode;
-  fromText?: boolean;
-  /** Text flow: show trash drop target only while dragging a layer. */
+  /** Show trash drop target while dragging a text layer. */
   showTextTrashDropZone?: boolean;
-  /** Text flow: pointer is currently over trash hit target. */
+  /** Pointer is over the trash hit target. */
   isTextTrashHot?: boolean;
   textTrashButtonRef?: RefObject<HTMLButtonElement | null>;
 };
 
 /**
- * Preview box used by the Text flow — 4:5 / 9:16 aspect, media seeked to stored
- * playback time. Not used by AdjustMenu (which renders media inline for fast drag).
+ * Read-only media preview for the Text flow (4:5 / 9:16, seeked video frame).
+ * Adjust transforms come from `adjustByIndex`; editing is in AdjustMenu only.
+ * Position tags are rendered in AdjustMenu, not here.
  */
 export const AdjustPreviewFrame = ({
   exportMode,
   activeIndex,
   transform,
-  children,
-  fromText = false,
   showTextTrashDropZone = false,
   isTextTrashHot = false,
   textTrashButtonRef,
@@ -137,7 +134,7 @@ export const AdjustPreviewFrame = ({
           <p className="text-white">No media</p>
         )}
       </div>
-      {fromText && showTextTrashDropZone ? (
+      {showTextTrashDropZone ? (
         <div className="pointer-events-none absolute bottom-3 left-1/2 z-40 flex -translate-x-1/2 flex-col items-center justify-center gap-1.5">
           <p
             id="text-trash-drop-label"
@@ -160,7 +157,6 @@ export const AdjustPreviewFrame = ({
           </button>
         </div>
       ) : null}
-      {children}
     </div>
   );
 };

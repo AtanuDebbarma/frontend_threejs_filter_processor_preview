@@ -1,7 +1,7 @@
 {
-  "version": "0.0.1g_a",
+  "version": "0.0.1g_b",
   "url": "index.html",
-  "sha256": "8e91a068b641088021a8ba5495292a883e732bdf2642879f734adf2028beb325",
-  "sizeBytes": 2706349,
+  "sha256": "d4c0bd84e3846b025004023aa6f896ff42319733d5b3aea73c91a87c68454d50",
+  "sizeBytes": 2705987,
   "minAppVersion": "0.0.0"
 }
