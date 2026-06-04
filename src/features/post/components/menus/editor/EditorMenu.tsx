@@ -8,8 +8,7 @@ import {
   inlineStyle,
 } from '@/features/post/helpers/menus/editor_helpers';
 import type {ColorBalance} from '@/shared/types/filterTypes';
-import {faArrowLeft} from '@fortawesome/free-solid-svg-icons';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import {MenuBackButtonRow} from '@/shared/components/MenuBackButton';
 import {defaultEditor, type EditorRecord} from '@/store/editorSlice';
 import type {AppColors, Insets} from '@/shared/types/webBridgeTypes';
 
@@ -181,14 +180,7 @@ export const EditorMenu = ({
           backgroundColor: appColors.bottomMenuBackground,
           paddingBottom: `${safeInsets.bottom + 10}px`,
         }}>
-        <div className="flex items-center px-4 py-1">
-          <button
-            onClick={handleBack}
-            className="flex items-center gap-1 text-orange-600 transition-opacity duration-180 active:opacity-50">
-            <FontAwesomeIcon icon={faArrowLeft} size="sm" />
-            <span className="text-sm font-medium">Back</span>
-          </button>
-        </div>
+        <MenuBackButtonRow onClick={handleBack} />
 
         <div
           className={`${view === 'Color Balance' ? 'pt-[-1.8rem] pb-2' : 'pt-[-1rem] pb-4'} text-center`}>

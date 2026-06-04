@@ -5,9 +5,9 @@ import {
   faSliders,
   faImage,
   faFont,
-  faArrowLeft,
   faFileExport,
 } from '@fortawesome/free-solid-svg-icons';
+import {MenuBackButtonRow} from '@/shared/components/MenuBackButton';
 import type {AppColors, Insets} from '@/shared/types/webBridgeTypes';
 import {requestSaveToDevice} from '@/features/post/bridge/helpers/saveBridge';
 type Props = {
@@ -63,15 +63,10 @@ export const EditorMenuMain = ({
         backgroundColor: appColors.bottomMenuBackground,
         paddingBottom: `${safeInsets.bottom + 10}px`,
       }}>
-      {/* Back button header */}
-      <div className="flex items-center px-4 py-2">
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-1 text-orange-600 transition-opacity duration-180 active:opacity-50">
-          <FontAwesomeIcon icon={faArrowLeft} size="sm" />
-          <span className="text-sm font-medium">Back</span>
-        </button>
-      </div>
+      <MenuBackButtonRow
+        onClick={handleBack}
+        wrapperClassName="flex items-center px-4 py-2"
+      />
 
       {/* Original buttons */}
       <div className="flex flex-row items-center justify-center pt-2 pb-5 text-sm font-medium">

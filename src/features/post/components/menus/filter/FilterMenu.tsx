@@ -4,8 +4,7 @@ import {getVideoThumbnail} from '@/features/post/helpers/filter/filter_helper';
 import {Loader} from '@/shared/components/Loader';
 import {FILTERS, CATEGORY_GRADIENTS} from '@/assets/filters/filterData';
 import type {FilterItem} from '@/shared/types/filterTypes';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
-import {faArrowLeft} from '@fortawesome/free-solid-svg-icons';
+import {MenuBackButtonRow} from '@/shared/components/MenuBackButton';
 import type {AppColors, Insets} from '@/shared/types/webBridgeTypes';
 import {rnLogger} from '@/shared/utils/rnLogger';
 
@@ -157,15 +156,10 @@ export const FilterMenu = ({
         backgroundColor: appColors.bottomMenuBackground,
         paddingBottom: `${safeInsets.bottom + 10}px`,
       }}>
-      {/* Back button header */}
-      <div className="flex items-center px-4 py-3">
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-1 text-orange-600 transition-opacity duration-180 active:opacity-50">
-          <FontAwesomeIcon icon={faArrowLeft} size="sm" />
-          <span className="text-sm font-medium">Back</span>
-        </button>
-      </div>
+      <MenuBackButtonRow
+        onClick={handleBack}
+        wrapperClassName="flex items-center px-4 py-3"
+      />
 
       <div className="-mt-4 flex w-full flex-col">
         <div className="w-full pt-0 pb-3 text-center">

@@ -3,9 +3,9 @@ import {appStore} from '@/store/appStore';
 import {DEFAULT_TEXT_COLOR} from '@/store/textSlice';
 import {DEFAULT_TEXT_BACKGROUND_COLOR} from '@/store/textSlice';
 import type {TextLayer} from '@/store/textSlice';
-import {faArrowLeft} from '@fortawesome/free-solid-svg-icons';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import React, {useCallback, useMemo, useRef} from 'react';
+import {HorizontalOptionChips} from './shared/HorizontalOptionChips';
+import {TextSubMenuFooter} from './shared/TextSubMenuFooter';
 
 type Props = {
   safeInsets: Insets;
@@ -17,6 +17,14 @@ type BackgroundMode =
   | 'square'
   | 'rounded'
   | 'outlined';
+
+const MODE_BUTTONS: Array<{id: BackgroundMode; label: string}> = [
+  {id: 'defaultPill', label: 'Classic'},
+  {id: 'none', label: 'No Background'},
+  {id: 'square', label: 'Square'},
+  {id: 'rounded', label: 'Rounded'},
+  {id: 'outlined', label: 'Outlined'},
+];
 
 const resolveModeFromLayer = (layer: TextLayer | null): BackgroundMode => {
   if (!layer) return 'defaultPill';
@@ -166,62 +174,17 @@ export const TextBackgroundMenu = ({safeInsets}: Props): React.JSX.Element => {
     ],
   );
 
-  const modeButtons: Array<{id: BackgroundMode; label: string}> = [
-    {id: 'defaultPill', label: 'Classic'},
-    {id: 'none', label: 'No Background'},
-    {id: 'square', label: 'Square'},
-    {id: 'rounded', label: 'Rounded'},
-    {id: 'outlined', label: 'Outlined'},
-  ];
-
   return (
-    <footer
-      className="pointer-events-none fixed right-0 bottom-0 left-0 z-5000 flex flex-col bg-transparent"
-      style={{
-        paddingBottom: `${safeInsets.bottom + 10}px`,
-      }}>
-      {/* Back button header */}
-      <div className="pointer-events-none flex items-center px-4 py-0">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="pointer-events-auto flex items-center gap-1 text-orange-600 transition-opacity duration-180 active:opacity-50">
-          <FontAwesomeIcon icon={faArrowLeft} size="sm" />
-          <span className="text-sm font-medium">Back</span>
-        </button>
-      </div>
-      <div className="pb-4 text-center text-white/65">
-        <h3 className="text-sm font-medium">Choose Text Background</h3>
-      </div>
-
-      <div
-        className="scrollbar-hide pointer-events-none mx-2 mb-5 flex overflow-x-auto"
-        style={{WebkitOverflowScrolling: 'touch'}}>
-        {modeButtons.map(({id, label}) => {
-          const isSelected = selectedMode === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => handleModeSelect(id)}
-              className="pointer-events-auto mx-1.5 shrink-0 rounded-lg border px-4 py-2 shadow-sm transition-opacity duration-180 active:opacity-50"
-              style={{
-                backgroundColor: isSelected
-                  ? '#ff4800'
-                  : 'rgba(217, 217, 217, 1)',
-                borderColor: isSelected ? '#ff4800' : 'rgba(209 213 219,1)',
-              }}>
-              <p
-                className="text-sm font-medium text-nowrap"
-                style={{
-                  color: isSelected ? '#ffffff' : 'rgba(0, 0, 0, 1)',
-                }}>
-                {label}
-              </p>
-            </button>
-          );
-        })}
-      </div>
-    </footer>
+    <TextSubMenuFooter
+      safeInsets={safeInsets}
+      title="Choose Text Background"
+      onBack={handleBack}>
+      <HorizontalOptionChips
+        options={MODE_BUTTONS}
+        selectedId={selectedMode}
+        onSelect={handleModeSelect}
+        rowClassName="mx-2 mb-5 flex"
+      />
+    </TextSubMenuFooter>
   );
 };

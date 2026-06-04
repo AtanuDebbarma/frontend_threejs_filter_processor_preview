@@ -1,4 +1,4 @@
-// src/components/FilteredMedia.tsx
+// src\features\post\components\canvas\FilteredMedia.tsx
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useFrame, useThree} from '@react-three/fiber';
 import * as THREE from 'three';

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": ["src/main.{ts,tsx,js,jsx}"],
+  "ignoreDependencies": [
+    "immer",
+    "eslint-config-prettier",
+    "eslint-import-resolver-typescript"
+  ],
+  "duplicates": {
+    "minOccurrences": 3,
+    "ignore": [
+      "**/lib/**",
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/docs/**",
+      "src/App.tsx",
+      "src/store/*",
+      "src/features/post/components/canvas/*"
+    ],
+    "mode": "mild"
+  },
+  "health": {
+    "ignore": ["src/features/post/components/canvas/FilteredMedia.tsx"]
+  },
+  "rules": {
+    "circular-dependencies": "error"
+  }
+}

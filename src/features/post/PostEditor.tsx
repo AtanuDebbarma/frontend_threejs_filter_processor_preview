@@ -1,12 +1,11 @@
 import React from 'react';
 import {appStore} from '@/store/appStore';
 import MediaComponent from '@/features/post/components/canvas/MediaComponent';
-import {AudioMenu} from '@/features/post/components/menus/AudioMenu';
 import BottomBar from '@/features/post/components/menus/BottomBar';
 import {EditorMenu} from '@/features/post/components/menus/editor/EditorMenu';
 import {FilterMenu} from '@/features/post/components/menus/filter/FilterMenu';
-import {StickerMenu} from '@/features/post/components/menus/StickerMenu';
-import {TextMenu} from '@/features/post/components/menus/text/TextMenu';
+import {PlaceholderFeatureMenu} from '@/features/post/components/menus/shared/PlaceholderFeatureMenu';
+import {TextMenuMain} from '@/features/post/components/menus/text/TextMenu';
 import {EditorMenuMain} from '@/features/post/components/menus/editor/EditorMenuMain';
 import {AdjustMenu} from '@/features/post/components/menus/adjust/AdjustMenu';
 import {FontStyleMenu} from '@/features/post/components/menus/text/FontStyleMenu';
@@ -50,12 +49,13 @@ export function PostEditor({
         {buttonsOpen && activeButton === 'filter' && (
           <FilterMenu appColors={appColors} safeInsets={safeInsets} />
         )}
-        {buttonsOpen && activeButton === 'sticker' && (
-          <StickerMenu appColors={appColors} safeInsets={safeInsets} />
-        )}
-        {buttonsOpen && activeButton === 'audio' && (
-          <AudioMenu appColors={appColors} safeInsets={safeInsets} />
-        )}
+        {buttonsOpen &&
+          (activeButton === 'sticker' || activeButton === 'audio') && (
+            <PlaceholderFeatureMenu
+              appColors={appColors}
+              safeInsets={safeInsets}
+            />
+          )}
         {buttonsOpen && activeButton === 'editor' && (
           <EditorMenu appColors={appColors} safeInsets={safeInsets} />
         )}
@@ -64,7 +64,7 @@ export function PostEditor({
           (activeButton === 'text' ||
             activeButton === 'textColor' ||
             activeButton === 'textBackgroundColor') && (
-            <TextMenu safeInsets={safeInsets} />
+            <TextMenuMain safeInsets={safeInsets} />
           )}
         {buttonsOpen &&
           activeButton !== null &&

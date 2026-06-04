@@ -1,6 +1,5 @@
 import React, {useEffect, useMemo} from 'react';
-
-import VideoSRC2 from './assets/ufc.mp4';
+// import VideoSRC2 from './assets/ufc.mp4';
 import {appStore} from './store/appStore';
 import type {FilterItem} from '@/shared/types/filterTypes';
 import {
@@ -12,14 +11,10 @@ import {Loader} from '@/shared/components/Loader';
 import type {ApplyHydrationOptions} from '@/shared/helpers/hydrationBridge';
 import {useEditorLogging} from '@/shared/hooks/useEditorLogging';
 import {useMediaReadyHydration} from '@/shared/hooks/useMediaReadyHydration';
-import {useDevMockHydration} from '@/shared/hooks/useDevMockHydration';
+// import {useDevMockHydration} from '@/shared/hooks/useDevMockHydration';
 import {useRnCapabilitiesProbe} from '@/shared/hooks/useRnCapabilitiesProbe';
 import type {ExportMode} from '@/shared/types/exportMode';
-import type {
-  AppColors,
-  HydrationPayload,
-  Insets,
-} from '@/shared/types/webBridgeTypes';
+import type {AppColors, Insets} from '@/shared/types/webBridgeTypes';
 import {PostEditor} from '@/features/post/PostEditor';
 import {usePostRnDocumentHandler} from '@/features/post/bridge/hooks/usePostRnDocumentHandler';
 
@@ -38,24 +33,24 @@ const DEFAULT_APP_COLORS: AppColors = {
   buttonColor: 'rgba(217, 217, 217, 1)',
 };
 
-const DEV_MOCK_HYDRATION: HydrationPayload = {
-  file: [
-    {
-      id: 'dev-mock-video',
-      filename: 'ufc.mp4',
-      uri: VideoSRC2,
-      mediaType: 'video',
-      width: 1920,
-      height: 1080,
-      duration: 30,
-    },
-  ],
-  exportMode: 'post',
-  dpr: typeof window !== 'undefined' ? window.devicePixelRatio || 2 : 2,
-  appColors: DEFAULT_APP_COLORS,
-  insets: {top: 0, bottom: 10, left: 0, right: 0},
-  production: false,
-};
+// const DEV_MOCK_HYDRATION: HydrationPayload = {
+//   file: [
+//     {
+//       id: 'dev-mock-video',
+//       filename: 'ufc.mp4',
+//       uri: VideoSRC2,
+//       mediaType: 'video',
+//       width: 1920,
+//       height: 1080,
+//       duration: 30,
+//     },
+//   ],
+//   exportMode: 'post',
+//   dpr: typeof window !== 'undefined' ? window.devicePixelRatio || 2 : 2,
+//   appColors: DEFAULT_APP_COLORS,
+//   insets: {top: 0, bottom: 10, left: 0, right: 0},
+//   production: false,
+// };
 
 const App = (): React.JSX.Element => {
   const activeFilter: FilterItem = appStore(state => state.activeFilter);
@@ -109,10 +104,10 @@ const App = (): React.JSX.Element => {
     applyLogConfigFromHydration,
   });
 
-  useDevMockHydration({
-    hydrationHandlers,
-    mockPayload: DEV_MOCK_HYDRATION,
-  });
+  // useDevMockHydration({
+  //   hydrationHandlers,
+  //   mockPayload: DEV_MOCK_HYDRATION,
+  // });
 
   usePostRnDocumentHandler({
     exportMode,
@@ -132,33 +127,34 @@ const App = (): React.JSX.Element => {
     }
   }, [mediaFiles, storeDpr]);
 
-  if (isInitializing) {
-    return (
-      <div
-        className="flex h-screen w-screen items-center justify-center"
-        style={{backgroundColor: appColors.backgroundColorMain}}>
-        <Loader size={40} color="#FF4800" borderWidth={3.5} />
-      </div>
-    );
-  }
-
-  if (exportMode !== 'post') {
-    return (
-      <div
-        className="flex h-screen w-screen items-center justify-center"
-        style={{backgroundColor: appColors.backgroundColorMain}}>
-        <Loader size={40} color="#FF4800" borderWidth={3.5} />
-      </div>
-    );
-  }
-
-  return (
-    <PostEditor
-      exportMode={exportMode}
-      appColors={appColors}
-      safeInsets={safeInsets}
-    />
+  const renderLoader = () => (
+    <div
+      className="flex h-screen w-screen items-center justify-center"
+      style={{backgroundColor: appColors.backgroundColorMain}}>
+      <Loader size={40} color="#FF4800" borderWidth={3.5} />
+    </div>
   );
+
+  if (isInitializing) {
+    return renderLoader();
+  }
+
+  const renderContent = () => {
+    switch (exportMode) {
+      case 'post':
+        return (
+          <PostEditor
+            exportMode={exportMode}
+            appColors={appColors}
+            safeInsets={safeInsets}
+          />
+        );
+      default:
+        return renderLoader();
+    }
+  };
+
+  return <React.Fragment>{renderContent()}</React.Fragment>;
 };
 
 export default App;

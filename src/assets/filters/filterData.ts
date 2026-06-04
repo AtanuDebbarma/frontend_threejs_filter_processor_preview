@@ -1,5 +1,5 @@
 // src/assets/filters/filterData.ts
-
+//fallow-ignore-file
 import type {FilterItem} from '@/shared/types/filterTypes';
 
 /**

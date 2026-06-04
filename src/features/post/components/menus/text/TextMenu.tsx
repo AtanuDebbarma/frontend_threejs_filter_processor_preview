@@ -34,7 +34,7 @@ type Props = {
   safeInsets: Insets;
 };
 
-export const TextMenu = ({safeInsets}: Props): React.JSX.Element => {
+export const TextMenuMain = ({safeInsets}: Props): React.JSX.Element => {
   const setActiveButton = appStore(state => state.setActiveButton);
   const activeButton = appStore(state => state.activeButton);
   const activeIndex = appStore(state => state.activeIndex);

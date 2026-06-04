@@ -5,13 +5,23 @@ import {
   type FontStyleLabel,
 } from '@/assets/fonts/fontStyles';
 import {appStore} from '@/store/appStore';
-import {faArrowLeft} from '@fortawesome/free-solid-svg-icons';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
-import React, {useCallback, useEffect, useMemo, useRef} from 'react';
+import React, {useCallback, useMemo} from 'react';
+import {HorizontalOptionChips} from './shared/HorizontalOptionChips';
+import {TextSubMenuFooter} from './shared/TextSubMenuFooter';
+import {useHorizontalChipScroll} from './shared/useHorizontalChipScroll';
+import {chipLabelColors} from './shared/chipOptionStyles';
 
 type Props = {
   safeInsets: Insets;
 };
+
+const FONT_CHIP_OPTIONS = FONT_STYLES.map(({label, weight, style, family}) => ({
+  id: label,
+  label,
+  weight,
+  style,
+  family,
+}));
 
 export const FontStyleMenu = ({safeInsets}: Props): React.JSX.Element => {
   const setActiveButton = appStore(state => state.setActiveButton);
@@ -32,11 +42,12 @@ export const FontStyleMenu = ({safeInsets}: Props): React.JSX.Element => {
   }, [attachmentId, textSlide]);
 
   const selectedLayerId = activeLayer?.id ?? null;
-  const referenceLayer = activeLayer;
-  const selectedLabel =
-    referenceLayer?.fontStyleLabel ?? DEFAULT_FONT_STYLE_LABEL;
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const selectedLabel = activeLayer?.fontStyleLabel ?? DEFAULT_FONT_STYLE_LABEL;
+
+  const {scrollContainerRef, registerButtonRef} = useHorizontalChipScroll({
+    options: FONT_CHIP_OPTIONS,
+    selectedId: selectedLabel,
+  });
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -68,96 +79,33 @@ export const FontStyleMenu = ({safeInsets}: Props): React.JSX.Element => {
     ],
   );
 
-  useEffect(() => {
-    const selectedIndex = FONT_STYLES.findIndex(
-      style => style.label === selectedLabel,
-    );
-    if (selectedIndex < 0) return;
-
-    const selectedButton = buttonRefs.current[selectedLabel];
-    if (!selectedButton) return;
-
-    // Edge items: only ensure visible; middle items: center in viewport.
-    if (selectedIndex === 0 || selectedIndex === FONT_STYLES.length - 1) {
-      selectedButton.scrollIntoView({
-        block: 'nearest',
-        inline: 'nearest',
-        behavior: 'auto',
-      });
-      return;
-    }
-
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const targetLeft =
-      selectedButton.offsetLeft -
-      (container.clientWidth - selectedButton.offsetWidth) / 2;
-    const maxScrollLeft = Math.max(
-      0,
-      container.scrollWidth - container.clientWidth,
-    );
-    container.scrollTo({
-      left: Math.min(Math.max(0, targetLeft), maxScrollLeft),
-      behavior: 'auto',
-    });
-  }, [selectedLabel]);
-
   return (
-    <footer
-      className="pointer-events-none fixed right-0 bottom-0 left-0 z-5000 flex flex-col bg-transparent"
-      style={{
-        paddingBottom: `${safeInsets.bottom + 10}px`,
-      }}>
-      {/* Back button header */}
-      <div className="pointer-events-none flex items-center px-4 py-0">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="pointer-events-auto flex items-center gap-1 text-orange-600 transition-opacity duration-180 active:opacity-50">
-          <FontAwesomeIcon icon={faArrowLeft} size="sm" />
-          <span className="text-sm font-medium">Back</span>
-        </button>
-      </div>
-      <div className="pb-4 text-center text-white/65">
-        <h3 className="text-sm font-medium">Choose Font Style</h3>
-      </div>
-
-      <div
-        ref={scrollContainerRef}
-        className="scrollbar-hide pointer-events-none mx-2 flex overflow-x-auto"
-        style={{WebkitOverflowScrolling: 'touch'}}>
-        {FONT_STYLES.map(({label, weight, style, family}) => {
-          const isSelected = selectedLabel === label;
+    <TextSubMenuFooter
+      safeInsets={safeInsets}
+      title="Choose Font Style"
+      onBack={handleBack}>
+      <HorizontalOptionChips
+        options={FONT_CHIP_OPTIONS}
+        selectedId={selectedLabel}
+        onSelect={handleFontSelect}
+        scrollContainerRef={scrollContainerRef}
+        registerButtonRef={registerButtonRef}
+        renderLabel={(option, isSelected) => {
+          const font = FONT_STYLES.find(s => s.label === option.id);
           return (
-            <button
-              key={label}
-              ref={el => {
-                buttonRefs.current[label] = el;
-              }}
-              type="button"
-              onClick={() => handleFontSelect(label)}
-              className="pointer-events-auto mx-1.5 shrink-0 rounded-lg border px-4 py-2 shadow-sm transition-opacity duration-180 active:opacity-50"
+            <p
+              className="text-lg text-nowrap"
               style={{
-                backgroundColor: isSelected
-                  ? '#ff4800'
-                  : 'rgba(217, 217, 217, 1)',
-                borderColor: isSelected ? '#ff4800' : 'rgba(209 213 219,1)',
+                ...chipLabelColors(isSelected),
+                fontWeight: font?.weight,
+                fontStyle: font?.style,
+                fontFamily: font?.family,
               }}>
-              <p
-                className="text-lg text-nowrap"
-                style={{
-                  color: isSelected ? '#ffffff' : 'rgba(0, 0, 0, 1)',
-                  fontWeight: weight,
-                  fontStyle: style,
-                  fontFamily: family,
-                }}>
-                {label}
-              </p>
-            </button>
+              {option.label}
+            </p>
           );
-        })}
-      </div>
-    </footer>
+        }}
+      />
+    </TextSubMenuFooter>
   );
 };
