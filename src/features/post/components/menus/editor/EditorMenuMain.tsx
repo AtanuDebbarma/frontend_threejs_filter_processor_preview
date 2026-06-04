@@ -8,6 +8,7 @@ import {
   faFileExport,
 } from '@fortawesome/free-solid-svg-icons';
 import {MenuBackButtonRow} from '@/shared/components/MenuBackButton';
+import {navigateBackFromEditorMainMenu} from '@/features/post/bridge/helpers/performEditorBack';
 import type {AppColors, Insets} from '@/shared/types/webBridgeTypes';
 import {requestSaveToDevice} from '@/features/post/bridge/helpers/saveBridge';
 type Props = {
@@ -53,7 +54,7 @@ export const EditorMenuMain = ({
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setActiveButton('mainMenu');
+    navigateBackFromEditorMainMenu();
   };
 
   return (

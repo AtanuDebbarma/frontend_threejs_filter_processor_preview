@@ -5,7 +5,7 @@ import BottomBar from '@/features/post/components/menus/BottomBar';
 import {EditorMenu} from '@/features/post/components/menus/editor/EditorMenu';
 import {FilterMenu} from '@/features/post/components/menus/filter/FilterMenu';
 import {PlaceholderFeatureMenu} from '@/features/post/components/menus/shared/PlaceholderFeatureMenu';
-import {TextMenuMain} from '@/features/post/components/menus/text/TextMenu';
+import {TextMenuMain} from '@/features/post/components/menus/text/TextMenuMain';
 import {EditorMenuMain} from '@/features/post/components/menus/editor/EditorMenuMain';
 import {AdjustMenu} from '@/features/post/components/menus/adjust/AdjustMenu';
 import {FontStyleMenu} from '@/features/post/components/menus/text/FontStyleMenu';
@@ -15,6 +15,7 @@ import {TEXT_FLOW_BUTTONS} from '@/features/post/constants/textFlowButtons';
 import type {ExportMode} from '@/shared/types/exportMode';
 import type {AppColors, Insets} from '@/shared/types/webBridgeTypes';
 import {useAdjustMenusRnSync} from '@/features/post/hooks/useAdjustMenusRnSync';
+import {useEditorActiveButtonRnSync} from '@/features/post/hooks/useEditorActiveButtonRnSync';
 
 type PostEditorProps = {
   exportMode: ExportMode;
@@ -32,6 +33,7 @@ export function PostEditor({
   const buttonsOpen = activeButton !== null;
 
   useAdjustMenusRnSync();
+  useEditorActiveButtonRnSync();
 
   return (
     <main

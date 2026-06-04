@@ -14,6 +14,7 @@ import {defaultAdjustTransform, type AdjustRecord} from '@/store/adjustSlice';
 import type {ExportMode, Insets} from '@/shared/types/webBridgeTypes';
 import {rnLogger} from '@/shared/utils/rnLogger';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
+import {registerAdjustMenuBackHandler} from '@/features/post/bridge/helpers/editorMenuBackBridge';
 
 type Props = {
   exportMode: ExportMode;
@@ -263,24 +264,32 @@ export const AdjustMenu = ({
     },
   );
 
-  const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
+  const changeButton = useCallback(() => {
+    setActiveButton('editorMainMenu');
+  }, [setActiveButton]);
+
+  const performAdjustMenuBack = useCallback((): boolean => {
     if (tagMode) {
       setActiveButton('mainMenu');
       setTagMode(false);
-      return;
+      return true;
     }
     setPosition({x: 0, y: 0});
     setScale(1);
     setRotation(0);
     setLocalBgColor(defaultAdjustTransform.bgColor);
-    setTimeout(() => {
-      changeButton();
-    }, 200);
-  };
+    setTimeout(() => changeButton(), 200);
+    return true;
+  }, [tagMode, setActiveButton, setTagMode, changeButton]);
 
-  const changeButton = () => {
-    setActiveButton('editorMainMenu');
+  useEffect(() => {
+    registerAdjustMenuBackHandler(performAdjustMenuBack);
+    return () => registerAdjustMenuBackHandler(null);
+  }, [performAdjustMenuBack]);
+
+  const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    performAdjustMenuBack();
   };
 
   const reset = () => {

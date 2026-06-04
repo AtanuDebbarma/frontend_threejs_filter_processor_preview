@@ -23,13 +23,15 @@ export const TextSubMenuFooter = ({
     style={{
       paddingBottom: `${safeInsets.bottom + 10}px`,
     }}>
-    <MenuBackButtonRow
-      onClick={onBack}
-      wrapperClassName="pointer-events-none flex items-center px-4 py-0"
-      className={`pointer-events-auto ${menuBackButtonClassName}`}
-    />
-    <div className="pb-4 text-center text-white/65">
-      <h3 className="text-sm font-medium">{title}</h3>
+    <div className="relative flex min-h-9 items-center px-4 pb-4">
+      <MenuBackButtonRow
+        onClick={onBack}
+        wrapperClassName="pointer-events-auto relative z-10 flex shrink-0 items-center py-0 pr-2 pl-0"
+        className={menuBackButtonClassName}
+      />
+      <h3 className="pointer-events-none absolute left-1/2 max-w-[70%] -translate-x-1/2 text-center text-sm font-medium text-nowrap text-white/75">
+        {title}
+      </h3>
     </div>
     {children}
   </footer>

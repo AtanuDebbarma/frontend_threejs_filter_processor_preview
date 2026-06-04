@@ -5,6 +5,7 @@ import {Loader} from '@/shared/components/Loader';
 import {FILTERS, CATEGORY_GRADIENTS} from '@/assets/filters/filterData';
 import type {FilterItem} from '@/shared/types/filterTypes';
 import {MenuBackButtonRow} from '@/shared/components/MenuBackButton';
+import {navigateBackFromFeatureMenu} from '@/features/post/bridge/helpers/performEditorBack';
 import type {AppColors, Insets} from '@/shared/types/webBridgeTypes';
 import {rnLogger} from '@/shared/utils/rnLogger';
 
@@ -34,7 +35,6 @@ export const FilterMenu = ({
   const setActiveFilter = appStore(state => state.setActiveFilter);
   const setThumbCache = appStore(state => state.setThumbCache);
   const resetEditorState = appStore(state => state.resetEditorState);
-  const setActiveButton = appStore(state => state.setActiveButton);
 
   const [videoThumbnail, setVideoThumbnail] = useState<string | undefined>(
     undefined,
@@ -144,9 +144,7 @@ export const FilterMenu = ({
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setTimeout(() => {
-      setActiveButton('mainMenu');
-    }, 200);
+    setTimeout(() => navigateBackFromFeatureMenu(), 200);
   };
 
   return (

@@ -18,6 +18,7 @@ import {
   requestCancelPostExport,
 } from '@/features/post/bridge/helpers/postBridge';
 import {postPostExportFailed} from '@/features/post/bridge/helpers/postExportRnMessages';
+import {performEditorBack} from '@/features/post/bridge/helpers/performEditorBack';
 
 type UsePostRnDocumentHandlerParams = {
   exportMode: ExportMode;
@@ -166,6 +167,11 @@ export function usePostRnDocumentHandler({
 
           case 'SAVE_EXPORT_FAILED': {
             setIsSaveExporting(false);
+            break;
+          }
+
+          case 'EDITOR_BACK': {
+            performEditorBack();
             break;
           }
 
