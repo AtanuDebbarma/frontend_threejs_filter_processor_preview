@@ -1,7 +1,7 @@
 import type {StateCreator} from 'zustand';
 import type {AppState} from './appStore';
-import type {MediaFile} from '../types/filterTypes';
-import type {PostExportItem} from '../helpers/exportTypes';
+import type {MediaFile} from '@/shared/types/filterTypes';
+import type {PostExportItem} from '@/features/post/types/exportTypes';
 import {defaultEditor} from './editorSlice';
 import {defaultAdjustTransform} from './adjustSlice';
 

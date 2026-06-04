@@ -1,7 +1,7 @@
 import type {StateCreator} from 'zustand';
-import {fnLog} from '../utils/rnLogger';
+import {fnLog} from '@/shared/utils/rnLogger';
 import type {AppState} from './appStore';
-import {defaultFilter, type FilterItem} from '../types/filterTypes';
+import {defaultFilter, type FilterItem} from '@/shared/types/filterTypes';
 
 export type FilterSliceType = {
   activeFilter: FilterItem;

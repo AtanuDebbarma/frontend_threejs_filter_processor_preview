@@ -1,6 +1,6 @@
 import type {StateCreator} from 'zustand';
 import type {AppState} from './appStore';
-import type {ColorBalance} from '../types/filterTypes';
+import type {ColorBalance} from '@/shared/types/filterTypes';
 
 // ---------------------------
 // Types
