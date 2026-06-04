@@ -1,6 +1,6 @@
 // src/assets/filters/filterData.ts
-
-import type {FilterItem} from '../../types/filterTypes';
+//fallow-ignore-file
+import type {FilterItem} from '@/shared/types/filterTypes';
 
 /**
  * List of available filters

@@ -457,9 +457,10 @@ export const createTextSlice: StateCreator<
     set(state => {
       const slide = state.textEditorByIndex[index];
       if (!slide || slide.id !== id) return;
-      slide.layers.forEach(layer => {
-        layer.textAlign = textAlign;
-      });
+      slide.layers = slide.layers.map(layer => ({
+        ...layer,
+        textAlign,
+      }));
     }),
 
   setAllTextLayersUnderline: (index, id, underline) =>
