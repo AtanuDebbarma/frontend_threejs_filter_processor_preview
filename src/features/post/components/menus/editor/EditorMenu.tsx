@@ -1,5 +1,7 @@
 // src/components/Menus/EditorMenu.tsx
-import React, {useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
+import {registerEditorMenuBackHandler} from '@/features/post/bridge/helpers/editorMenuBackBridge';
+import {navigateBackFromEditorSliders} from '@/features/post/bridge/helpers/performEditorBack';
 import {EditableFilters, type EditorFilter} from '@/assets/filters/editorData';
 import {appStore} from '@/store/appStore';
 import {
@@ -34,8 +36,6 @@ export const EditorMenu = ({
   const mediaFiles = appStore(state => state.mediaFiles);
   const activeIndex = appStore(state => state.activeIndex);
   const resetEditorState = appStore(state => state.resetEditorState);
-  const setActiveButton = appStore(state => state.setActiveButton);
-
   // Zustand selectors: always called unconditionally
   const editorByIndex: EditorRecord = appStore(state => state.editorByIndex);
   const currentSelected = editorByIndex[activeIndex].value ?? defaultEditor;
@@ -160,15 +160,23 @@ export const EditorMenu = ({
     }
   };
 
+  const performEditorMenuBack = useCallback((): boolean => {
+    if (view !== 'Editor') {
+      setView('Editor');
+      return true;
+    }
+    navigateBackFromEditorSliders();
+    return true;
+  }, [view]);
+
+  useEffect(() => {
+    registerEditorMenuBackHandler(performEditorMenuBack);
+    return () => registerEditorMenuBackHandler(null);
+  }, [performEditorMenuBack]);
+
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setTimeout(() => {
-      if (view !== 'Editor') {
-        setView('Editor');
-      } else {
-        setActiveButton('editorMainMenu');
-      }
-    }, 200);
+    setTimeout(() => performEditorMenuBack(), 200);
   };
 
   return (

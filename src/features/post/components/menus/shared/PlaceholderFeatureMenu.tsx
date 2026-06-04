@@ -1,6 +1,6 @@
 import React, {type MouseEvent} from 'react';
-import {appStore} from '@/store/appStore';
 import {MenuBackButtonRow} from '@/shared/components/MenuBackButton';
+import {navigateBackFromFeatureMenu} from '@/features/post/bridge/helpers/performEditorBack';
 import type {AppColors, Insets} from '@/shared/types/webBridgeTypes';
 
 export type PlaceholderFeatureMenuProps = {
@@ -17,13 +17,9 @@ export const PlaceholderFeatureMenu = ({
   appColors,
   safeInsets,
 }: PlaceholderFeatureMenuProps): React.JSX.Element => {
-  const setActiveButton = appStore(state => state.setActiveButton);
-
   const handleBack = (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setTimeout(() => {
-      setActiveButton('mainMenu');
-    }, 200);
+    setTimeout(() => navigateBackFromFeatureMenu(), 200);
   };
 
   return (

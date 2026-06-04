@@ -48,7 +48,7 @@ export function HorizontalOptionChips<T extends string>({
               renderLabel(option, isSelected)
             ) : (
               <p
-                className="text-sm font-medium text-nowrap"
+                className="text-md font-medium text-nowrap"
                 style={chipLabelColors(isSelected)}>
                 {option.label}
               </p>

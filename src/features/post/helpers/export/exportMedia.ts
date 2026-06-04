@@ -169,6 +169,7 @@ export const exportActiveSlideForGallery = async (
   const progress = createExportProgressReporter(fileId);
 
   try {
+    progress(5, 'encoding', true);
     const blobOrVoid = await captureExportBlob(
       sourceCanvas,
       width,
@@ -206,6 +207,8 @@ export const exportActiveSlideForGallery = async (
       return {kind: 'chunked', id: fileId, index};
     }
 
+    progress(75, 'encoding', true);
+
     let exportBase64: string;
     try {
       exportBase64 = await blobToBase64(blob);
@@ -223,6 +226,8 @@ export const exportActiveSlideForGallery = async (
       media.mediaType === 'photo'
         ? `${baseName}_export.jpg`
         : `${baseName}_export.mp4`;
+
+    progress(95, 'encoding', true);
 
     rnLogger.log(
       `📤 Export done id=${fileId} bytes≈${Math.round((exportBase64.length * 3) / 4)}`,

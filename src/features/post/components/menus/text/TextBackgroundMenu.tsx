@@ -6,6 +6,7 @@ import type {TextLayer} from '@/store/textSlice';
 import React, {useCallback, useMemo, useRef} from 'react';
 import {HorizontalOptionChips} from './shared/HorizontalOptionChips';
 import {TextSubMenuFooter} from './shared/TextSubMenuFooter';
+import {navigateBackToTextMenu} from '@/features/post/bridge/helpers/performEditorBack';
 
 type Props = {
   safeInsets: Insets;
@@ -56,7 +57,6 @@ const modePatch = (
 };
 
 export const TextBackgroundMenu = ({safeInsets}: Props): React.JSX.Element => {
-  const setActiveButton = appStore(state => state.setActiveButton);
   const activeIndex = appStore(state => state.activeIndex);
   const mediaFiles = appStore(state => state.mediaFiles);
   const textSlide = appStore(state => state.textEditorByIndex[activeIndex]);
@@ -98,9 +98,7 @@ export const TextBackgroundMenu = ({safeInsets}: Props): React.JSX.Element => {
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setTimeout(() => {
-      setActiveButton('text');
-    }, 200);
+    setTimeout(() => navigateBackToTextMenu(), 200);
   };
 
   const handleModeSelect = useCallback(
@@ -183,7 +181,6 @@ export const TextBackgroundMenu = ({safeInsets}: Props): React.JSX.Element => {
         options={MODE_BUTTONS}
         selectedId={selectedMode}
         onSelect={handleModeSelect}
-        rowClassName="mx-2 mb-5 flex"
       />
     </TextSubMenuFooter>
   );

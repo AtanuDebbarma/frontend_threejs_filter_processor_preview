@@ -10,6 +10,7 @@ import {HorizontalOptionChips} from './shared/HorizontalOptionChips';
 import {TextSubMenuFooter} from './shared/TextSubMenuFooter';
 import {useHorizontalChipScroll} from './shared/useHorizontalChipScroll';
 import {chipLabelColors} from './shared/chipOptionStyles';
+import {navigateBackToTextMenu} from '@/features/post/bridge/helpers/performEditorBack';
 
 type Props = {
   safeInsets: Insets;
@@ -24,7 +25,6 @@ const FONT_CHIP_OPTIONS = FONT_STYLES.map(({label, weight, style, family}) => ({
 }));
 
 export const FontStyleMenu = ({safeInsets}: Props): React.JSX.Element => {
-  const setActiveButton = appStore(state => state.setActiveButton);
   const activeIndex = appStore(state => state.activeIndex);
   const mediaFiles = appStore(state => state.mediaFiles);
   const textSlide = appStore(state => state.textEditorByIndex[activeIndex]);
@@ -51,9 +51,7 @@ export const FontStyleMenu = ({safeInsets}: Props): React.JSX.Element => {
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setTimeout(() => {
-      setActiveButton('text');
-    }, 200);
+    setTimeout(() => navigateBackToTextMenu(), 200);
   };
 
   const handleFontSelect = useCallback(
@@ -94,7 +92,7 @@ export const FontStyleMenu = ({safeInsets}: Props): React.JSX.Element => {
           const font = FONT_STYLES.find(s => s.label === option.id);
           return (
             <p
-              className="text-lg text-nowrap"
+              className="text-md text-nowrap"
               style={{
                 ...chipLabelColors(isSelected),
                 fontWeight: font?.weight,

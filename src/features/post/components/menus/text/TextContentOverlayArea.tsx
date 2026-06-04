@@ -15,6 +15,7 @@ import {StoryTextPill, type StoryTextPillHandle} from './StoryTextPill';
 import {TextLayerGestureSurface} from './TextLayerGestureSurface';
 import type {ExportMode} from '@/features/post/types/exportTypes';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
+import {navigateBackFromTextOverlay} from '@/features/post/bridge/helpers/performEditorBack';
 
 type Props = {
   exportMode: ExportMode;
@@ -231,16 +232,7 @@ export const TextContentOverlayArea = ({
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setTimeout(() => {
-      if (isAnyColorPickerMode) {
-        setActiveButton('text');
-        return;
-      }
-      if (attachmentId) {
-        pruneEmptyTextLayers(activeIndex, attachmentId);
-      }
-      setActiveButton('editorMainMenu');
-    }, 200);
+    setTimeout(() => navigateBackFromTextOverlay(), 200);
   };
 
   const closeTop = isPostLayoutMode(exportMode)
