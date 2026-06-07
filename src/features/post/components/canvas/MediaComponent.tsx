@@ -6,6 +6,8 @@ import useWindowSize from '@/features/post/hooks/canvas/findWindowSize';
 import {faXmark, faPlus} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import type {ExportMode} from '@/features/post/types/exportTypes';
+import {MENU_CHROME_CANVAS_INTERACTIVE_CLASS} from '@/features/post/helpers/menuChrome/menuChromeClasses';
+import {scheduleSetActiveButton} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
 
 const MediaComponent = ({
@@ -13,8 +15,13 @@ const MediaComponent = ({
 }: {
   exportMode: ExportMode;
 }): React.JSX.Element => {
-  const setActiveButton = appStore(state => state.setActiveButton);
   const mediaFiles = appStore(state => state.mediaFiles);
+  const isMenuChromeTransitioning = appStore(
+    state => state.isMenuChromeTransitioning,
+  );
+  const canvasLockClass = isMenuChromeTransitioning
+    ? 'menu-chrome-input-locked'
+    : '';
 
   const windowSize = useWindowSize();
 
@@ -78,9 +85,7 @@ const MediaComponent = ({
 
   const handleClose = (e: any) => {
     e.preventDefault();
-    setTimeout(() => {
-      setActiveButton(null);
-    }, 200);
+    scheduleSetActiveButton(null);
   };
   const handleIconPress = (close: boolean, add: boolean) => {
     setTimeout(() => {
@@ -103,7 +108,8 @@ const MediaComponent = ({
       {!isPostLayoutMode(exportMode) ? (
         <div className="flex h-full w-full items-center justify-center">
           <div className="relative aspect-9/16 max-h-full w-full max-w-full rounded-lg border-[0.5px] border-gray-500 bg-gray-950">
-            <div className="flex h-full w-full min-w-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden scroll-smooth">
+            <div
+              className={`${MENU_CHROME_CANVAS_INTERACTIVE_CLASS} ${canvasLockClass} flex h-full w-full min-w-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden scroll-smooth`}>
               <MediaCanvasContainer exportMode={exportMode} />
             </div>
           </div>
@@ -130,7 +136,7 @@ const MediaComponent = ({
 
             <div
               style={innerContainerStyle}
-              className="flex min-w-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden scroll-smooth">
+              className={`${MENU_CHROME_CANVAS_INTERACTIVE_CLASS} ${canvasLockClass} flex min-w-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden scroll-smooth`}>
               <MediaCanvasContainer exportMode={exportMode} />
             </div>
           </div>

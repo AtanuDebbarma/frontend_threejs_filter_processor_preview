@@ -1,5 +1,4 @@
 import React from 'react';
-import {appStore} from '@/store/appStore';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {
   faFilter,
@@ -12,6 +11,8 @@ import type {
   ExportMode,
   Insets,
 } from '@/shared/types/webBridgeTypes';
+import {MENU_CHROME_FOOTER_CLASS} from '@/features/post/helpers/menuChrome/menuChromeClasses';
+import {scheduleSetActiveButton} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
 
 type Props = {
@@ -25,22 +26,17 @@ const BottomBar = ({
   appColors,
   safeInsets,
 }: Props): React.JSX.Element => {
-  const setActiveButton = appStore(state => state.setActiveButton);
-
   const handleButtonToggle = (
     button: 'filter' | 'sticker' | 'audio' | 'editorMainMenu',
     e: React.MouseEvent<HTMLButtonElement>,
   ) => {
     e.preventDefault();
-
-    setTimeout(() => {
-      setActiveButton(button);
-    }, 200);
+    scheduleSetActiveButton(button);
   };
 
   return (
     <footer
-      className="flex flex-row items-center justify-center rounded-t-lg border-t border-gray-200 pt-5 text-sm font-medium shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
+      className={`${MENU_CHROME_FOOTER_CLASS} flex flex-row items-center justify-center rounded-t-lg border-t border-gray-200 pt-5 text-sm font-medium shadow-[0_-2px_10px_rgba(0,0,0,0.2)]`}
       style={{
         backgroundColor: appColors.bottomMenuBackground,
         paddingBottom: `${safeInsets.bottom + 10}px`,

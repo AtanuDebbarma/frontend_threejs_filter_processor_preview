@@ -9,6 +9,11 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import {MenuBackButtonRow} from '@/shared/components/MenuBackButton';
 import {navigateBackFromEditorMainMenu} from '@/features/post/bridge/helpers/performEditorBack';
+import {MENU_CHROME_FOOTER_CLASS} from '@/features/post/helpers/menuChrome/menuChromeClasses';
+import {
+  runMenuChromeNavigationImmediate,
+  scheduleSetActiveButton,
+} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 import type {AppColors, Insets} from '@/shared/types/webBridgeTypes';
 import {requestSaveToDevice} from '@/features/post/bridge/helpers/saveBridge';
 type Props = {
@@ -22,7 +27,6 @@ export const EditorMenuMain = ({
 }: Props): React.JSX.Element => {
   const mediaFiles = appStore(state => state.mediaFiles);
   const activeIndex = appStore(state => state.activeIndex);
-  const setActiveButton = appStore(state => state.setActiveButton);
   const isSaveExporting = appStore(state => state.isSaveExporting);
 
   const currentID = useMemo(() => {
@@ -34,9 +38,7 @@ export const EditorMenuMain = ({
     e: React.MouseEvent<HTMLButtonElement>,
   ) => {
     e.preventDefault();
-    setTimeout(() => {
-      setActiveButton(button);
-    }, 200);
+    scheduleSetActiveButton(button);
   };
   const handleSave = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -54,12 +56,12 @@ export const EditorMenuMain = ({
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    navigateBackFromEditorMainMenu();
+    runMenuChromeNavigationImmediate(navigateBackFromEditorMainMenu, 'footer');
   };
 
   return (
     <footer
-      className="z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]"
+      className={`${MENU_CHROME_FOOTER_CLASS} z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]`}
       style={{
         backgroundColor: appColors.bottomMenuBackground,
         paddingBottom: `${safeInsets.bottom + 10}px`,

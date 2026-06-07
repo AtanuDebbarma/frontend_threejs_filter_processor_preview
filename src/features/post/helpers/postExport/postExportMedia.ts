@@ -24,12 +24,18 @@ import {
   postExportProgress,
   postExportSuccess,
   postPostExportFailed,
+  flushPendingExportSuccesses,
+  consumeLastFlushedSuccessIds,
 } from '@/features/post/bridge/helpers/postExportRnMessages';
 import {
   resolveExportDimensionsForMode,
   type ExportMode,
 } from '@/features/post/types/exportTypes';
-import {uploadEncodedMediaToEndpoint} from '@/features/post/helpers/export/uploadExport';
+import {
+  abortActivePostUpload,
+  uploadEncodedMediaToEndpoint,
+} from '@/features/post/helpers/export/uploadExport';
+import {isPostExportPausedError} from '@/features/post/helpers/postExport/postExportPause';
 
 const waitForAnimationFrame = (): Promise<void> =>
   new Promise(resolve => {
@@ -56,6 +62,23 @@ const resolveMimeType = (blob: Blob, mediaType: 'photo' | 'video'): string => {
     return blob.type;
   }
   return mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
+};
+
+const isPostExportPauseRequested = (): boolean =>
+  appStore.getState().postExportCancelRequested;
+
+const attachPostExportPauseListener = (): (() => void) => {
+  const onVisibilityChange = (): void => {
+    if (!document.hidden || !appStore.getState().isPostExporting) {
+      return;
+    }
+    appStore.getState().setPostExportCancelRequested(true);
+    abortActivePostUpload();
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  return () => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+  };
 };
 
 /**
@@ -150,19 +173,30 @@ export const runPostExportBatch = async (
   }
 
   pauseAllPreviewVideos();
+  flushPendingExportSuccesses();
+  const flushedSuccessIds = new Set(consumeLastFlushedSuccessIds());
+  const batchItems = postExportItems.filter(
+    item => !flushedSuccessIds.has(item.id),
+  );
+  const detachPostExportPauseListener = attachPostExportPauseListener();
 
   try {
-    for (let fileIndex = 0; fileIndex < postExportItems.length; fileIndex++) {
-      if (appStore.getState().postExportCancelRequested) {
+    for (let fileIndex = 0; fileIndex < batchItems.length; fileIndex++) {
+      if (isPostExportPauseRequested()) {
         rnLogger.log('📤 Post export batch paused (cancel requested)');
         break;
       }
 
-      const item = postExportItems[fileIndex];
+      const item = batchItems[fileIndex];
       const {id, index, mediaType} = item;
 
       appStore.getState().setActiveIndex(index);
       await settleSlideForExport(index);
+
+      if (isPostExportPauseRequested()) {
+        rnLogger.log('📤 Post export paused before encode');
+        break;
+      }
 
       postExportProgress({
         id,
@@ -175,6 +209,11 @@ export const runPostExportBatch = async (
       let blob: Blob | null = null;
       try {
         blob = await exportSlideToBlob(index, id, exportMode);
+
+        if (isPostExportPauseRequested()) {
+          rnLogger.log('📤 Post export paused after encode (before upload)');
+          break;
+        }
 
         postExportProgress({
           id,
@@ -222,7 +261,20 @@ export const runPostExportBatch = async (
           fileIndex: index,
           fileCount,
         });
+        flushPendingExportSuccesses();
+
+        if (isPostExportPauseRequested()) {
+          rnLogger.log('📤 Post export paused after file success');
+          break;
+        }
       } catch (fileErr) {
+        if (isPostExportPausedError(fileErr) || isPostExportPauseRequested()) {
+          rnLogger.log('📤 Post export file paused (no failure to RN)', {
+            id,
+            index,
+          });
+          break;
+        }
         const message =
           fileErr instanceof Error ? fileErr.message : 'Post export failed';
         const technical =
@@ -245,6 +297,10 @@ export const runPostExportBatch = async (
 
     rnLogger.log('✅ Post batch encode + upload complete');
   } catch (err) {
+    if (isPostExportPausedError(err) || isPostExportPauseRequested()) {
+      rnLogger.log('📤 Post batch paused (no failure to RN)');
+      return;
+    }
     const technical =
       err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     rnLogger.componentLog(
@@ -255,6 +311,7 @@ export const runPostExportBatch = async (
     );
     throw err;
   } finally {
+    detachPostExportPauseListener();
     const wasCancelled = appStore.getState().postExportCancelRequested;
     appStore.getState().setPostExportCancelRequested(false);
     appStore.getState().setIsPostExporting(false);

@@ -23,9 +23,7 @@ export const MediaTagIcon = ({
   return (
     <button
       type="button"
-      onClick={() => {
-        window.setTimeout(() => onTagPress(), 200);
-      }}
+      onClick={() => onTagPress()}
       className="absolute bottom-2 left-2 z-500 rounded-full bg-white/40 text-white shadow-sm transition-opacity duration-180 active:opacity-50">
       <FontAwesomeIcon icon={faCircleUser} size="lg" color="black" />
     </button>

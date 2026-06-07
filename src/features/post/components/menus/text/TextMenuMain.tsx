@@ -27,6 +27,8 @@ import {
   faUnderline,
 } from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import {MENU_CHROME_FOOTER_CLASS} from '@/features/post/helpers/menuChrome/menuChromeClasses';
+import {scheduleSetActiveButton} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 import type {Insets} from '@/shared/types/webBridgeTypes';
 import type {IconDefinition} from '@fortawesome/fontawesome-svg-core';
 
@@ -296,13 +298,11 @@ export const TextMenuMain = ({safeInsets}: Props): React.JSX.Element => {
     e: React.MouseEvent<HTMLButtonElement>,
   ) => {
     e.preventDefault();
-    setTimeout(() => {
-      if (button === null) {
-        createNextTextLayer();
-        return;
-      }
-      setActiveButton(button);
-    }, 200);
+    if (button === null) {
+      window.setTimeout(() => createNextTextLayer(), 200);
+      return;
+    }
+    scheduleSetActiveButton(button);
   };
 
   const menuButtons = useMemo(
@@ -347,7 +347,7 @@ export const TextMenuMain = ({safeInsets}: Props): React.JSX.Element => {
 
   return (
     <footer
-      className="pointer-events-none relative z-5000 flex flex-col bg-transparent"
+      className={`${MENU_CHROME_FOOTER_CLASS} pointer-events-none relative z-5000 flex flex-col bg-transparent`}
       style={{
         paddingBottom: `${safeInsets.bottom + 10}px`,
       }}>

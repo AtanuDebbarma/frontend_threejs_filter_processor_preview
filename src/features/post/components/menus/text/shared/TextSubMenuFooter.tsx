@@ -1,3 +1,4 @@
+import {MENU_CHROME_FOOTER_CLASS} from '@/features/post/helpers/menuChrome/menuChromeClasses';
 import type {Insets} from '@/shared/types/webBridgeTypes';
 import {
   MenuBackButtonRow,
@@ -19,7 +20,7 @@ export const TextSubMenuFooter = ({
   children,
 }: TextSubMenuFooterProps): React.JSX.Element => (
   <footer
-    className="pointer-events-none fixed right-0 bottom-0 left-0 z-5000 flex flex-col bg-transparent"
+    className={`${MENU_CHROME_FOOTER_CLASS} pointer-events-none fixed right-0 bottom-0 left-0 z-5000 flex flex-col bg-transparent`}
     style={{
       paddingBottom: `${safeInsets.bottom + 10}px`,
     }}>

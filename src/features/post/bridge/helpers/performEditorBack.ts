@@ -3,6 +3,7 @@ import {
   runAdjustMenuBack,
   runEditorMenuBack,
 } from '@/features/post/bridge/helpers/editorMenuBackBridge';
+import {cancelMenuChromeNavigation} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 import {appStore} from '@/store/appStore';
 import type {ButtonStateType} from '@/store/buttonSlices';
 
@@ -56,6 +57,7 @@ export function navigateBackFromTextFlow(): void {
  * @returns false when already at root (mainMenu / null).
  */
 export function performEditorBack(): boolean {
+  cancelMenuChromeNavigation();
   const state = appStore.getState();
   const {activeButton} = state;
 

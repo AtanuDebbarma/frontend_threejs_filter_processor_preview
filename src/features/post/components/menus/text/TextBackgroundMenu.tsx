@@ -7,6 +7,7 @@ import React, {useCallback, useMemo, useRef} from 'react';
 import {HorizontalOptionChips} from './shared/HorizontalOptionChips';
 import {TextSubMenuFooter} from './shared/TextSubMenuFooter';
 import {navigateBackToTextMenu} from '@/features/post/bridge/helpers/performEditorBack';
+import {scheduleMenuChromeBack} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 
 type Props = {
   safeInsets: Insets;
@@ -98,7 +99,7 @@ export const TextBackgroundMenu = ({safeInsets}: Props): React.JSX.Element => {
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setTimeout(() => navigateBackToTextMenu(), 200);
+    scheduleMenuChromeBack(navigateBackToTextMenu);
   };
 
   const handleModeSelect = useCallback(

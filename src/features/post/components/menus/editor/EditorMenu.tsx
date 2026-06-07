@@ -1,6 +1,8 @@
 // src/components/Menus/EditorMenu.tsx
 import React, {useCallback, useEffect, useState} from 'react';
 import {registerEditorMenuBackHandler} from '@/features/post/bridge/helpers/editorMenuBackBridge';
+import {MENU_CHROME_FOOTER_CLASS} from '@/features/post/helpers/menuChrome/menuChromeClasses';
+import {scheduleMenuChromeBack} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 import {navigateBackFromEditorSliders} from '@/features/post/bridge/helpers/performEditorBack';
 import {EditableFilters, type EditorFilter} from '@/assets/filters/editorData';
 import {appStore} from '@/store/appStore';
@@ -176,14 +178,14 @@ export const EditorMenu = ({
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setTimeout(() => performEditorMenuBack(), 200);
+    scheduleMenuChromeBack(performEditorMenuBack);
   };
 
   return (
     <>
       <style>{inlineStyle}</style>
       <footer
-        className={`fixed right-0 bottom-0 left-0 z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]`}
+        className={`${MENU_CHROME_FOOTER_CLASS} fixed right-0 bottom-0 left-0 z-5000 flex flex-col rounded-t-lg border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]`}
         style={{
           backgroundColor: appColors.bottomMenuBackground,
           paddingBottom: `${safeInsets.bottom + 10}px`,
