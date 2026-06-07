@@ -11,6 +11,7 @@ import {TextSubMenuFooter} from './shared/TextSubMenuFooter';
 import {useHorizontalChipScroll} from './shared/useHorizontalChipScroll';
 import {chipLabelColors} from './shared/chipOptionStyles';
 import {navigateBackToTextMenu} from '@/features/post/bridge/helpers/performEditorBack';
+import {scheduleMenuChromeBack} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 
 type Props = {
   safeInsets: Insets;
@@ -51,7 +52,7 @@ export const FontStyleMenu = ({safeInsets}: Props): React.JSX.Element => {
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setTimeout(() => navigateBackToTextMenu(), 200);
+    scheduleMenuChromeBack(navigateBackToTextMenu);
   };
 
   const handleFontSelect = useCallback(

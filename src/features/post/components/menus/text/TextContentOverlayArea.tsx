@@ -16,6 +16,11 @@ import {TextLayerGestureSurface} from './TextLayerGestureSurface';
 import type {ExportMode} from '@/features/post/types/exportTypes';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
 import {navigateBackFromTextOverlay} from '@/features/post/bridge/helpers/performEditorBack';
+import {
+  MENU_CHROME_TEXT_OVERLAY_CLASS,
+  MENU_CHROME_TEXT_OVERLAY_ENTER_CLASS,
+} from '@/features/post/helpers/menuChrome/menuChromeClasses';
+import {scheduleMenuChromeBack} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 
 type Props = {
   exportMode: ExportMode;
@@ -28,6 +33,12 @@ export const TextContentOverlayArea = ({
 }: Props): React.JSX.Element => {
   const setActiveButton = appStore(state => state.setActiveButton);
   const activeButton = appStore(state => state.activeButton);
+  const isMenuChromeTransitioning = appStore(
+    state => state.isMenuChromeTransitioning,
+  );
+  const menuChromeTransitionKind = appStore(
+    state => state.menuChromeTransitionKind,
+  );
   const mediaFiles = appStore(state => state.mediaFiles);
   const isTextEditing = activeButton === 'text';
   const isTextColorMode = activeButton === 'textColor';
@@ -232,8 +243,15 @@ export const TextContentOverlayArea = ({
 
   const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setTimeout(() => navigateBackFromTextOverlay(), 200);
+    scheduleMenuChromeBack(navigateBackFromTextOverlay);
   };
+
+  const overlayEnterClass =
+    menuChromeTransitionKind === 'overlay-enter'
+      ? MENU_CHROME_TEXT_OVERLAY_ENTER_CLASS
+      : '';
+  const gesturesEnabled =
+    !isMenuChromeTransitioning && !isIndividualTextColorMode;
 
   const closeTop = isPostLayoutMode(exportMode)
     ? 'top-5 left-6 '
@@ -241,12 +259,16 @@ export const TextContentOverlayArea = ({
 
   return (
     <div
-      className="pointer-events-auto absolute inset-0 z-4000 h-full max-w-full overflow-hidden rounded-lg bg-[rgba(0,0,0,0.8)] px-0 backdrop-blur-lg"
+      className={`${MENU_CHROME_TEXT_OVERLAY_CLASS} ${overlayEnterClass} absolute inset-0 z-4000 h-full max-w-full overflow-hidden rounded-lg bg-[rgba(0,0,0,0.8)] px-0 backdrop-blur-lg ${
+        isMenuChromeTransitioning
+          ? 'pointer-events-none'
+          : 'pointer-events-auto'
+      }`}
       style={{paddingBottom: `${safeInsets.bottom + 10}px`}}>
       <button
         type="button"
         onClick={handleBack}
-        className={`absolute ${closeTop} z-1000 -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-100/20 bg-black/40 p-1 text-sm text-white hover:bg-black/80`}>
+        className={`pointer-events-auto absolute ${closeTop} z-1000 -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-100/20 bg-black/40 p-1 text-sm text-white hover:bg-black/80`}>
         <FontAwesomeIcon icon={faXmark} size="lg" color="white" />
       </button>
       <div className="relative h-full min-h-0 w-full max-w-full min-w-0 overflow-hidden">
@@ -285,7 +307,7 @@ export const TextContentOverlayArea = ({
                   layer={renderLayer}
                   stageWidthPx={maxStageWidthPx}
                   stageHeightPx={maxStageHeightPx}
-                  enabled={!isIndividualTextColorMode}
+                  enabled={gesturesEnabled}
                   shrinkForTrashDrop={
                     isTextDragActive &&
                     draggingLayerId === layer.id &&

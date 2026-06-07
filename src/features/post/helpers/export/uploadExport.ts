@@ -3,12 +3,32 @@
  * Mirrors RN `exportHelpers.uploadSingleMedia` (FormData field `file`, JSON `{ url }`).
  */
 
+import {appStore} from '@/store/appStore';
+import {PostExportPausedError} from '@/features/post/helpers/postExport/postExportPause';
+
 export type UploadEncodedMediaParams = {
   endpointUrl: string;
   blob: Blob;
   filename: string;
   mimeType: string;
   onProgress?: (percent: number) => void;
+};
+
+let activePostUploadXhr: XMLHttpRequest | null = null;
+
+const isPostUploadPauseRequested = (): boolean =>
+  appStore.getState().postExportCancelRequested || document.hidden;
+
+/** Abort in-flight Post S3 XHR when RN pauses export (app background). */
+export const abortActivePostUpload = (): void => {
+  if (!activePostUploadXhr) {
+    return;
+  }
+  try {
+    activePostUploadXhr.abort();
+  } catch {
+    /* ignore */
+  }
 };
 
 export const uploadEncodedMediaToEndpoint = async ({
@@ -31,6 +51,7 @@ export const uploadEncodedMediaToEndpoint = async ({
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    activePostUploadXhr = xhr;
     xhr.open('POST', endpointUrl);
 
     xhr.upload.onprogress = event => {
@@ -44,6 +65,7 @@ export const uploadEncodedMediaToEndpoint = async ({
     };
 
     xhr.onload = () => {
+      activePostUploadXhr = null;
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText) as {url?: string};
@@ -60,7 +82,22 @@ export const uploadEncodedMediaToEndpoint = async ({
       reject(new Error(`Upload failed with status ${xhr.status}`));
     };
 
-    xhr.onerror = () => reject(new Error('Network error during upload'));
+    xhr.onabort = () => {
+      activePostUploadXhr = null;
+      reject(new PostExportPausedError('Upload aborted for post export pause'));
+    };
+
+    xhr.onerror = () => {
+      activePostUploadXhr = null;
+      if (isPostUploadPauseRequested()) {
+        reject(
+          new PostExportPausedError('Upload interrupted for post export pause'),
+        );
+        return;
+      }
+      reject(new Error('Network error during upload'));
+    };
+
     xhr.send(formData);
   });
 };

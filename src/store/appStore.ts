@@ -6,13 +6,18 @@ import {createFilterSlice, type FilterSliceType} from './filterSlice';
 import {createEditorSlice, type EditorState} from './editorSlice';
 import {createAdjustSlice, type AdjustState} from './adjustSlice';
 import {createTextSlice, type TextState} from './textSlice';
+import {
+  createMenuChromeSlice,
+  type MenuChromeSliceType,
+} from './menuChromeSlice';
 
 export type AppState = FileSliceType &
   ButtonSliceType &
   FilterSliceType &
   EditorState &
   AdjustState &
-  TextState;
+  TextState &
+  MenuChromeSliceType;
 
 export const appStore = create<AppState>()(
   immer((...store) => ({
@@ -22,5 +27,6 @@ export const appStore = create<AppState>()(
     ...createEditorSlice(...store),
     ...createAdjustSlice(...store),
     ...createTextSlice(...store),
+    ...createMenuChromeSlice(...store),
   })),
 );

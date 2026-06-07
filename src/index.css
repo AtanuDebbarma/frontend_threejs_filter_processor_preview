@@ -294,6 +294,103 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+/* --- Menu chrome transitions (footer sheets, adjust/text overlays) --- */
+.menu-chrome-footer {
+  view-transition-name: editor-menu-footer;
+}
+
+.menu-chrome-adjust-shell {
+  view-transition-name: editor-adjust-shell;
+}
+
+::view-transition-old(editor-menu-footer),
+::view-transition-new(editor-menu-footer),
+::view-transition-old(editor-adjust-shell),
+::view-transition-new(editor-adjust-shell) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+::view-transition-old(editor-menu-footer) {
+  animation-name: menu-chrome-footer-out;
+}
+
+::view-transition-new(editor-menu-footer) {
+  animation-name: menu-chrome-footer-in;
+}
+
+::view-transition-old(editor-adjust-shell) {
+  animation-name: menu-chrome-overlay-out;
+}
+
+::view-transition-new(editor-adjust-shell) {
+  animation-name: menu-chrome-overlay-in;
+}
+
+@keyframes menu-chrome-footer-out {
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes menu-chrome-footer-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes menu-chrome-overlay-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes menu-chrome-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.menu-chrome-text-overlay-enter {
+  animation: menu-chrome-text-overlay-in 280ms cubic-bezier(0.32, 0.72, 0, 1)
+    forwards;
+}
+
+@keyframes menu-chrome-text-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.menu-chrome-canvas-interactive.menu-chrome-input-locked {
+  pointer-events: none;
+  touch-action: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-chrome-text-overlay-enter {
+    animation: none;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
 /* Prevent zoom on iOS when focusing inputs */
 @media screen and (-webkit-min-device-pixel-ratio: 0) {
   select,

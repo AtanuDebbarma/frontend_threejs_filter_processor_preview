@@ -15,6 +15,11 @@ import type {ExportMode, Insets} from '@/shared/types/webBridgeTypes';
 import {rnLogger} from '@/shared/utils/rnLogger';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
 import {registerAdjustMenuBackHandler} from '@/features/post/bridge/helpers/editorMenuBackBridge';
+import {MENU_CHROME_ADJUST_SHELL_CLASS} from '@/features/post/helpers/menuChrome/menuChromeClasses';
+import {
+  cancelMenuChromeNavigation,
+  scheduleSetActiveButton,
+} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 
 type Props = {
   exportMode: ExportMode;
@@ -25,8 +30,10 @@ export const AdjustMenu = ({
   exportMode,
   safeInsets,
 }: Props): React.JSX.Element => {
-  const setActiveButton = appStore(state => state.setActiveButton);
   const mediaFiles = appStore(state => state.mediaFiles);
+  const isMenuChromeTransitioning = appStore(
+    state => state.isMenuChromeTransitioning,
+  );
   const activeIndex = appStore(state => state.activeIndex);
   const tagMode = appStore(state => state.tagMode);
   const setTagMode = appStore(state => state.setTagMode);
@@ -171,10 +178,14 @@ export const AdjustMenu = ({
     currentActiveId,
   ]);
 
+  const gesturesEnabled = !isMenuChromeTransitioning && !tagMode;
+  const tagPlacementEnabled =
+    !isMenuChromeTransitioning && tagMode && !isModalOpen && isPhotoSlide;
+
   // Gesture target is mediaRef — lives in the same component, no child re-render hop
   useGesture(
     {
-      onDrag: !tagMode
+      onDrag: gesturesEnabled
         ? ({offset: [x, y]}) => {
             setPosition({
               x: x * displayScale.x,
@@ -182,95 +193,90 @@ export const AdjustMenu = ({
             });
           }
         : undefined,
-      onPinch: !tagMode
+      onPinch: gesturesEnabled
         ? ({offset: [s, a]}) => {
             setScale(s);
             setRotation(a);
           }
         : undefined,
-      onClick:
-        tagMode && !isModalOpen && isPhotoSlide
-          ? ({event}) => {
-              if (!previewRef.current || isTagSelectionLocked) return;
-              // ✅ Double check modal isn't open
-              if (isModalOpen) return;
+      onClick: tagPlacementEnabled
+        ? ({event}) => {
+            if (!previewRef.current || isTagSelectionLocked) return;
+            // ✅ Double check modal isn't open
+            if (isModalOpen) return;
 
-              // Lock tag selection for 300ms
-              setIsTagSelectionLocked(true);
-              if (tagSelectionTimeoutRef.current) {
-                clearTimeout(tagSelectionTimeoutRef.current);
-              }
-              tagSelectionTimeoutRef.current = setTimeout(() => {
-                setIsTagSelectionLocked(false);
-              }, 300);
+            // Lock tag selection for 300ms
+            setIsTagSelectionLocked(true);
+            if (tagSelectionTimeoutRef.current) {
+              clearTimeout(tagSelectionTimeoutRef.current);
+            }
+            tagSelectionTimeoutRef.current = setTimeout(() => {
+              setIsTagSelectionLocked(false);
+            }, 300);
 
-              const e = event as MouseEvent;
-              const containerRect = previewRef.current.getBoundingClientRect();
-              const x = (e.clientX - containerRect.left) / containerRect.width;
-              const y = (e.clientY - containerRect.top) / containerRect.height;
+            const e = event as MouseEvent;
+            const containerRect = previewRef.current.getBoundingClientRect();
+            const x = (e.clientX - containerRect.left) / containerRect.width;
+            const y = (e.clientY - containerRect.top) / containerRect.height;
 
-              if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
-                const tagId = Date.now();
-                // Find the current max z among tags for this index
-                const existingTags = tagValuesByIndex[activeIndex] || [];
-                const maxZ =
-                  existingTags.tags.length &&
-                  existingTags.id === currentActiveId
-                    ? Math.max(...existingTags.tags.map(t => t.z ?? 0))
-                    : 0;
-                const zIndex = maxZ + 1;
+            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+              const tagId = Date.now();
+              // Find the current max z among tags for this index
+              const existingTags = tagValuesByIndex[activeIndex] || [];
+              const maxZ =
+                existingTags.tags.length && existingTags.id === currentActiveId
+                  ? Math.max(...existingTags.tags.map(t => t.z ?? 0))
+                  : 0;
+              const zIndex = maxZ + 1;
 
-                addTagToIndex(activeIndex, currentActiveId, {
-                  id: tagId,
-                  x,
-                  y,
-                  z: zIndex,
-                  username: '',
-                  userId: '',
-                });
+              addTagToIndex(activeIndex, currentActiveId, {
+                id: tagId,
+                x,
+                y,
+                z: zIndex,
+                username: '',
+                userId: '',
+              });
 
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(
-                    JSON.stringify({
-                      type: 'TAG_SEARCH',
-                      payload: {
-                        tagId,
-                        x,
-                        y,
-                        zIndex,
-                        mediaIndex: activeIndex,
-                        mediaID: currentActiveId,
-                      },
-                    }),
-                  );
-                }
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(
+                  JSON.stringify({
+                    type: 'TAG_SEARCH',
+                    payload: {
+                      tagId,
+                      x,
+                      y,
+                      zIndex,
+                      mediaIndex: activeIndex,
+                      mediaID: currentActiveId,
+                    },
+                  }),
+                );
               }
             }
-          : undefined,
+          }
+        : undefined,
     },
     {
       target: mediaRef,
       drag: {
         from: () => [position.x / displayScale.x, position.y / displayScale.y],
         filterTaps: true,
-        enabled: !tagMode,
+        enabled: gesturesEnabled,
       },
       pinch: {
         from: () => [scale, rotation],
         scaleBounds: {min: 0.5, max: 5},
         rubberband: true,
-        enabled: !tagMode,
+        enabled: gesturesEnabled,
       },
     },
   );
 
-  const changeButton = useCallback(() => {
-    setActiveButton('editorMainMenu');
-  }, [setActiveButton]);
-
   const performAdjustMenuBack = useCallback((): boolean => {
     if (tagMode) {
-      setActiveButton('mainMenu');
+      cancelMenuChromeNavigation();
+      appStore.getState().setActiveButton('mainMenu');
       setTagMode(false);
       return true;
     }
@@ -278,9 +284,9 @@ export const AdjustMenu = ({
     setScale(1);
     setRotation(0);
     setLocalBgColor(defaultAdjustTransform.bgColor);
-    setTimeout(() => changeButton(), 200);
+    scheduleSetActiveButton('editorMainMenu');
     return true;
-  }, [tagMode, setActiveButton, setTagMode, changeButton]);
+  }, [tagMode, setTagMode]);
 
   useEffect(() => {
     registerAdjustMenuBackHandler(performAdjustMenuBack);
@@ -312,9 +318,7 @@ export const AdjustMenu = ({
         bgColor: localBgColor,
       });
     }
-    setTimeout(() => {
-      changeButton();
-    }, 200);
+    scheduleSetActiveButton('editorMainMenu');
   };
 
   const handleManualCancel = (activeID: string, tagId: number) => {
@@ -361,7 +365,7 @@ export const AdjustMenu = ({
 
   return (
     <div
-      className="absolute right-0 bottom-0 left-0 z-5000 h-full rounded-lg bg-[rgba(0,0,0,0.8)] px-0 backdrop-blur-lg"
+      className={`${MENU_CHROME_ADJUST_SHELL_CLASS} absolute right-0 bottom-0 left-0 z-5000 h-full rounded-lg bg-[rgba(0,0,0,0.8)] px-0 backdrop-blur-lg`}
       onClick={() => setShowColorPicker(false)}
       style={{paddingBottom: `${safeInsets.bottom + 10}px`}}>
       <button

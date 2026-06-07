@@ -18,6 +18,7 @@ import {
 import {trimBase64} from '@/features/post/helpers/canvas/other_helpers';
 import {MediaCanvas} from './MediaCanvas';
 import type {ExportMode} from '@/features/post/types/exportTypes';
+import {scheduleSetTagMode} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
 
 export const MediaCanvasContainer = ({
@@ -409,7 +410,7 @@ export const MediaCanvasContainer = ({
             <MediaTagIcon
               mediaIndex={0}
               mediaList={mediaList}
-              onTagPress={() => setTagMode(true)}
+              onTagPress={() => scheduleSetTagMode(true)}
             />
             {/* UPDATED: Show button logic (like RN code) */}
             {(playerIconTappedMap[0] || !playingMap[0] || showButtonMap[0]) && (
@@ -466,7 +467,7 @@ export const MediaCanvasContainer = ({
             <MediaTagIcon
               mediaIndex={0}
               mediaList={mediaList}
-              onTagPress={() => setTagMode(true)}
+              onTagPress={() => scheduleSetTagMode(true)}
             />
 
             {showApplyingOnSlide(0) && (
@@ -522,7 +523,7 @@ export const MediaCanvasContainer = ({
                 <MediaTagIcon
                   mediaIndex={index}
                   mediaList={mediaList}
-                  onTagPress={() => setTagMode(true)}
+                  onTagPress={() => scheduleSetTagMode(true)}
                 />
 
                 {/* UPDATED: Show button logic (like RN code) */}
@@ -585,7 +586,7 @@ export const MediaCanvasContainer = ({
                 <MediaTagIcon
                   mediaIndex={index}
                   mediaList={mediaList}
-                  onTagPress={() => setTagMode(true)}
+                  onTagPress={() => scheduleSetTagMode(true)}
                 />
                 {showApplyingOnSlide(index) && (
                   <div className="absolute top-0 right-0 bottom-0 left-0 flex items-center justify-center">
