@@ -16,12 +16,14 @@ import {
 } from '@/features/post/helpers/canvas/exportVideoFrameFeed';
 import {defaultEditor} from '@/store/editorSlice';
 import {defaultAdjustTransform} from '@/store/adjustSlice';
+import {computeMediaFitLayout} from '@/features/post/helpers/adjust/mediaFitLayout';
+import type {ExportMode} from '@/shared/types/exportMode';
 
 type Props = {
   id: string;
   uri: string;
   isVideo: boolean;
-  fit?: 'contain' | 'cover';
+  exportMode: ExportMode;
   aspectType?: 'square' | 'landscape' | 'vertical';
   originalWidth?: number;
   originalHeight?: number;
@@ -76,6 +78,7 @@ const FilteredMediaInner = (props: Props): React.JSX.Element => {
   const temperature = currentSelectedEditor.temperature ?? 0.0;
   const blur = currentSelectedEditor.blur ?? 0.0;
   const adjustEntry = appStore(state => state.adjustByIndex[slideIndex]);
+  const canvasSize = appStore(state => state.canvasSize);
   const isSaveExporting = appStore(state => state.isSaveExporting);
   const isPostExporting = appStore(state => state.isPostExporting);
   const isVideoPipelineExporting = isSaveExporting || isPostExporting;
@@ -1110,12 +1113,15 @@ const FilteredMediaInner = (props: Props): React.JSX.Element => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const resolvedFit =
-    props.fit ?? (props.aspectType === 'vertical' ? 'cover' : 'contain');
-
-  // Calculate plane scale to fit like object-fit BUT use intrinsic media pixel size
-  const containerPixelW = Math.max(1, size.width);
-  const containerPixelH = Math.max(1, size.height);
+  // Prefer MediaCanvas-measured container (parity with AdjustMenu); fall back to R3F size.
+  const containerPixelW = Math.max(
+    1,
+    canvasSize.width > 0 ? canvasSize.width : size.width,
+  );
+  const containerPixelH = Math.max(
+    1,
+    canvasSize.height > 0 ? canvasSize.height : size.height,
+  );
 
   // intrinsic media pixel dimensions (preferred)
   const mediaPixelW =
@@ -1144,26 +1150,30 @@ const FilteredMediaInner = (props: Props): React.JSX.Element => {
   const safeMediaPixelH = Math.max(1, mediaPixelH);
 
   const worldPerPixel = viewport.width / Math.max(1, size.width);
-  const worldW = (props.originalWidth ?? safeMediaPixelW) * worldPerPixel;
-  const worldH = (props.originalHeight ?? safeMediaPixelH) * worldPerPixel;
+  const worldW = safeMediaPixelW * worldPerPixel;
+  const worldH = safeMediaPixelH * worldPerPixel;
 
-  const scaleFactor =
-    resolvedFit === 'contain'
-      ? Math.min(
-          containerPixelW / safeMediaPixelW,
-          containerPixelH / safeMediaPixelH,
-        )
-      : Math.max(
-          containerPixelW / safeMediaPixelW,
-          containerPixelH / safeMediaPixelH,
-        );
+  const fitLayout = computeMediaFitLayout(
+    containerPixelW,
+    containerPixelH,
+    safeMediaPixelW,
+    safeMediaPixelH,
+    props.exportMode,
+  );
+  const baseFitScale = fitLayout.baseFitScale;
 
-  const worldWScaled = worldW * scaleFactor;
-  const worldHScaled = worldH * scaleFactor;
+  const worldWScaled = worldW * baseFitScale;
+  const worldHScaled = worldH * baseFitScale;
+  const userScale = adjustTransform?.scale ?? 1;
 
-  // Apply adjustTransform.x/y normalized offsets relative to that
-  const posX = (adjustTransform?.x ?? 0) * worldWScaled;
-  const posY = -(adjustTransform?.y ?? 0) * worldHScaled;
+  // Match AdjustMenu: offsets are stored in media pixels, applied via displayScale.
+  const posX =
+    (((adjustTransform?.x ?? 0) * safeMediaPixelW) / fitLayout.displayScale.x) *
+    worldPerPixel;
+  const posY =
+    (-((adjustTransform?.y ?? 0) * safeMediaPixelH) /
+      fitLayout.displayScale.y) *
+    worldPerPixel;
 
   if (!currentSelectedID) {
     return <></>;
@@ -1174,11 +1184,7 @@ const FilteredMediaInner = (props: Props): React.JSX.Element => {
     <mesh
       ref={meshRef}
       position={[posX, posY, 0]}
-      scale={[
-        worldWScaled * (adjustTransform?.scale ?? 1),
-        worldHScaled * (adjustTransform?.scale ?? 1),
-        1,
-      ]}
+      scale={[worldWScaled * userScale, worldHScaled * userScale, 1]}
       rotation={[0, 0, -(adjustTransform?.rotation ?? 0) * (Math.PI / 180)]}
       onClick={props.handleTap}>
       <planeGeometry args={[1, 1]} />

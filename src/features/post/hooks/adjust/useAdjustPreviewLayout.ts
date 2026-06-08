@@ -1,73 +1,55 @@
 import {appStore} from '@/store/appStore';
+import {computeMediaFitLayout} from '@/features/post/helpers/adjust/mediaFitLayout';
 import {useElementSize} from '@/features/post/hooks/canvas/useElementSize';
 import type {ExportMode} from '@/features/post/types/exportTypes';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
 import {useMemo} from 'react';
 
-/** Same fit math as AdjustMenu — maps media pixels to preview box CSS. */
+/** Same fit math as FilteredMedia — maps media pixels to preview box CSS. */
 export const useAdjustPreviewLayout = (
   exportMode: ExportMode,
   activeIndex: number,
 ) => {
   const activeFile = appStore(state => state.mediaFiles[activeIndex]);
+  const canvasSize = appStore(state => state.canvasSize);
   const {ref: previewRef, size: previewSize} = useElementSize<HTMLDivElement>();
 
-  const displayScale = useMemo(() => {
-    if (!activeFile || !previewSize?.width || !previewSize?.height) {
-      return {x: 1, y: 1};
+  const layoutSize = useMemo(() => {
+    if (canvasSize.width > 0 && canvasSize.height > 0) {
+      return {width: canvasSize.width, height: canvasSize.height};
     }
-
-    const mediaAspect = activeFile.width / activeFile.height;
-    const previewAspect = previewSize.width / previewSize.height;
-
-    let displayedWidth: number;
-    let displayedHeight: number;
-
-    if (isPostLayoutMode(exportMode)) {
-      if (mediaAspect > previewAspect) {
-        displayedHeight = previewSize.height;
-        displayedWidth = displayedHeight * mediaAspect;
-      } else {
-        displayedWidth = previewSize.width;
-        displayedHeight = displayedWidth / mediaAspect;
-      }
-    } else if (mediaAspect > previewAspect) {
-      displayedWidth = previewSize.width;
-      displayedHeight = displayedWidth / mediaAspect;
-    } else {
-      displayedHeight = previewSize.height;
-      displayedWidth = displayedHeight * mediaAspect;
+    if (previewSize?.width && previewSize?.height) {
+      return {width: previewSize.width, height: previewSize.height};
     }
+    return null;
+  }, [canvasSize.width, canvasSize.height, previewSize]);
 
-    return {
-      x: activeFile.width / displayedWidth,
-      y: activeFile.height / displayedHeight,
-    };
-  }, [activeFile, previewSize, exportMode]);
-
-  const baseFitScale = useMemo(() => {
-    if (!activeFile || !previewSize?.width || !previewSize?.height) {
-      return 1;
+  const layout = useMemo(() => {
+    if (!activeFile || !layoutSize) {
+      return null;
     }
+    return computeMediaFitLayout(
+      layoutSize.width,
+      layoutSize.height,
+      activeFile.width,
+      activeFile.height,
+      exportMode,
+    );
+  }, [activeFile, layoutSize, exportMode]);
 
-    const mediaAspect = activeFile.width / activeFile.height;
-    const previewAspect = previewSize.width / previewSize.height;
+  const displayScale = layout?.displayScale ?? {x: 1, y: 1};
+  const baseFitScale = layout?.baseFitScale ?? 1;
 
-    if (isPostLayoutMode(exportMode)) {
-      return mediaAspect > previewAspect
-        ? previewSize.height / activeFile.height
-        : previewSize.width / activeFile.width;
-    }
-    return mediaAspect > previewAspect
-      ? previewSize.width / activeFile.width
-      : previewSize.height / activeFile.height;
-  }, [activeFile, previewSize, exportMode]);
+  const useCanvasDimensions = canvasSize.width > 0 && canvasSize.height > 0;
 
   return {
     activeFile,
     previewRef,
-    previewSize,
+    previewSize: layoutSize,
     displayScale,
     baseFitScale,
+    useCanvasDimensions,
+    canvasSize,
+    isPostLayout: isPostLayoutMode(exportMode),
   };
 };

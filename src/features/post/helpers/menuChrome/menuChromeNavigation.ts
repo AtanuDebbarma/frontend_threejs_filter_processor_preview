@@ -1,5 +1,6 @@
 import {TEXT_FLOW_BUTTONS} from '@/features/post/constants/textFlowButtons';
 import type {MenuChromeKind} from '@/features/post/helpers/menuChrome/menuChromeClasses';
+import {pauseAllPreviewVideos} from '@/features/post/helpers/export/exportPreviewControl';
 import {appStore} from '@/store/appStore';
 import type {ButtonStateType} from '@/store/buttonSlices';
 
@@ -119,9 +120,15 @@ export function scheduleMenuChromeNavigation(
   }, MENU_NAV_TAP_DELAY_MS);
 }
 
+const shouldPausePreviewForButton = (button: ButtonStateType): boolean =>
+  button === 'adjust' || (button !== null && TEXT_FLOW_BUTTONS.has(button));
+
 export function scheduleSetActiveButton(button: ButtonStateType): void {
   const state = appStore.getState();
   const kind = resolveMenuChromeKindForButton(state.activeButton, button);
+  if (shouldPausePreviewForButton(button)) {
+    pauseAllPreviewVideos();
+  }
   scheduleMenuChromeNavigation(() => state.setActiveButton(button), kind);
 }
 
@@ -134,6 +141,7 @@ export function scheduleSetTagMode(enabled: boolean): void {
     appStore.getState().setTagMode(false);
     return;
   }
+  pauseAllPreviewVideos();
   scheduleMenuChromeNavigation(
     () => appStore.getState().setTagMode(true),
     'adjust-overlay',
