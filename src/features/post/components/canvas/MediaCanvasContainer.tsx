@@ -19,6 +19,10 @@ import {trimBase64} from '@/features/post/helpers/canvas/other_helpers';
 import {MediaCanvas} from './MediaCanvas';
 import type {ExportMode} from '@/features/post/types/exportTypes';
 import {scheduleSetTagMode} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
+import {
+  pauseAllPreviewVideos,
+  shouldPausePreviewVideosForOverlay,
+} from '@/features/post/helpers/export/exportPreviewControl';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
 
 export const MediaCanvasContainer = ({
@@ -33,7 +37,12 @@ export const MediaCanvasContainer = ({
   const storeActiveIndex = appStore(state => state.activeIndex);
   const setActiveIndex = appStore(state => state.setActiveIndex);
   const buttonsOpen = useMemo(() => activeButton !== null, [activeButton]);
+  const tagMode = appStore(state => state.tagMode);
   const setTagMode = appStore(state => state.setTagMode);
+  const overlayPausesVideo = useMemo(
+    () => shouldPausePreviewVideosForOverlay(activeButton, tagMode),
+    [activeButton, tagMode],
+  );
   const globalMutedState = appStore(state => state.videoMutedState);
   const setVideoMutedState = appStore(state => state.setVideoMutedState);
   const isSaveExporting = appStore(state => state.isSaveExporting);
@@ -312,6 +321,55 @@ export const MediaCanvasContainer = ({
   }, [mediaList, setVideoMutedState]);
 
   const {activeIndex, setItemRef} = useActiveMediaIndex<HTMLDivElement>();
+
+  // Adjust / text / tag overlays: pause playback and cancel pending play toggles.
+  useEffect(() => {
+    if (!overlayPausesVideo) {
+      return;
+    }
+
+    Object.values(playTimeoutRefs.current).forEach(timeout => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    });
+    playTimeoutRefs.current = {};
+
+    Object.keys(videoRefs.current).forEach(k => {
+      const idx = Number(k);
+      const vid = videoRefs.current[idx]?.current;
+      if (!vid) {
+        return;
+      }
+      if (!vid.paused) {
+        try {
+          vid.pause();
+        } catch (e) {
+          rnLogger.componentLog(
+            'MediaCanvasContainer',
+            'error',
+            `Failed to pause video for overlay menu: ${e}`,
+          );
+        }
+      }
+    });
+
+    pauseAllPreviewVideos();
+
+    setPlayingMap(pm => {
+      let changed = false;
+      const next = {...pm};
+      Object.keys(videoRefs.current).forEach(k => {
+        const idx = Number(k);
+        if (next[idx]) {
+          next[idx] = false;
+          changed = true;
+        }
+      });
+      return changed ? next : pm;
+    });
+  }, [overlayPausesVideo]);
+
   // Pause non-active videos when activeIndex changes
   useEffect(() => {
     Object.keys(videoRefs.current).forEach(k => {

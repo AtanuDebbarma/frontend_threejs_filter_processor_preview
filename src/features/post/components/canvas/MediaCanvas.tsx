@@ -11,7 +11,6 @@ import {appStore} from '@/store/appStore';
 import {defaultAdjustTransform} from '@/store/adjustSlice';
 import {useElementSize} from '@/features/post/hooks/canvas/useElementSize';
 import type {ExportMode} from '@/features/post/types/exportTypes';
-import {isPostLayoutMode} from '@/features/post/types/exportTypes';
 
 type Props = {
   id: string;
@@ -98,10 +97,10 @@ export const MediaCanvas = ({
           id={id}
           uri={fileProps.uri}
           isVideo={video}
+          exportMode={exportMode}
           aspectType={aspectType}
           originalWidth={fileProps.width}
           originalHeight={fileProps.height}
-          fit={isPostLayoutMode(exportMode) ? 'cover' : 'contain'}
           videoRef={getVideoRef ? getVideoRef(index) : undefined}
           handleTap={() => (handleTap ? handleTap(index) : undefined)}
           muted={mutedMap ? mutedMap[index] : false}

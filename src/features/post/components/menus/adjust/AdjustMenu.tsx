@@ -69,10 +69,13 @@ export const AdjustMenu = ({
   const [rotation, setRotation] = useState(0);
 
   // Layout: displayScale maps media-pixel offsets → preview-pixel offsets, baseFitScale fits media into preview box
-  const {displayScale, baseFitScale, previewRef} = useAdjustPreviewLayout(
-    exportMode,
-    activeIndex,
-  );
+  const {
+    displayScale,
+    baseFitScale,
+    previewRef,
+    useCanvasDimensions,
+    canvasSize,
+  } = useAdjustPreviewLayout(exportMode, activeIndex);
 
   // Video: seek-to-time preview with poster/frame-ready states; photo: just uri
   const {
@@ -358,6 +361,16 @@ export const AdjustMenu = ({
   );
 
   const aspect = isPostLayoutMode(exportMode) ? 'aspect-4/5' : 'aspect-9/16';
+  const previewBoxStyle: React.CSSProperties = useCanvasDimensions
+    ? {
+        width: canvasSize.width,
+        height: canvasSize.height,
+        backgroundColor: localBgColor,
+      }
+    : {backgroundColor: localBgColor};
+  const previewBoxClass = useCanvasDimensions
+    ? 'relative mx-auto flex items-center justify-center overflow-hidden rounded-lg border'
+    : `relative flex w-full items-center justify-center overflow-hidden rounded-lg border ${aspect}`;
   const closeTop = isPostLayoutMode(exportMode)
     ? 'top-5 left-6 '
     : 'left-7 top-8';
@@ -375,10 +388,7 @@ export const AdjustMenu = ({
       </button>
 
       {/* Preview box — media lives here directly, gesture target is mediaRef */}
-      <div
-        ref={previewRef}
-        className={`relative flex w-full items-center justify-center overflow-hidden rounded-lg border ${aspect}`}
-        style={{backgroundColor: localBgColor}}>
+      <div ref={previewRef} className={previewBoxClass} style={previewBoxStyle}>
         <div className="flex h-full w-full items-center justify-center">
           {activeFile ? (
             isVideo ? (

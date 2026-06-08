@@ -33,8 +33,14 @@ export const AdjustPreviewFrame = ({
   isTextTrashHot = false,
   textTrashButtonRef,
 }: Props): React.JSX.Element => {
-  const {activeFile, previewRef, displayScale, baseFitScale} =
-    useAdjustPreviewLayout(exportMode, activeIndex);
+  const {
+    activeFile,
+    previewRef,
+    displayScale,
+    baseFitScale,
+    useCanvasDimensions,
+    canvasSize,
+  } = useAdjustPreviewLayout(exportMode, activeIndex);
 
   const {
     isVideo,
@@ -68,12 +74,19 @@ export const AdjustPreviewFrame = ({
 
   const aspect = isPostLayoutMode(exportMode) ? 'aspect-4/5' : 'aspect-9/16';
   const showVideoSpinner = isVideo && isLoading && !posterSrc && !isFrameReady;
+  const previewBoxStyle: React.CSSProperties = useCanvasDimensions
+    ? {
+        width: canvasSize.width,
+        height: canvasSize.height,
+        backgroundColor: transform.bgColor,
+      }
+    : {backgroundColor: transform.bgColor};
+  const previewBoxClass = useCanvasDimensions
+    ? 'relative mx-auto flex items-center justify-center overflow-hidden rounded-lg border'
+    : `relative flex w-full items-center justify-center overflow-hidden rounded-lg border ${aspect}`;
 
   return (
-    <div
-      ref={previewRef}
-      className={`relative flex w-full items-center justify-center overflow-hidden rounded-lg border ${aspect}`}
-      style={{backgroundColor: transform.bgColor}}>
+    <div ref={previewRef} className={previewBoxClass} style={previewBoxStyle}>
       <div className="flex h-full w-full items-center justify-center">
         {activeFile ? (
           isVideo ? (

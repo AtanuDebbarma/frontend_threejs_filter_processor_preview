@@ -74,6 +74,27 @@ type LoadedAudioForMux = {
   decoderConfig: AudioDecoderConfig;
 };
 
+/**
+ * MP4 mux requires non-negative PTS. Source files (especially AAC) may include
+ * priming packets with slightly negative timestamps while video export starts at 0.
+ */
+export const normalizeAudioPacketsForMux = (
+  packets: EncodedPacket[],
+): EncodedPacket[] => {
+  if (packets.length === 0) {
+    return packets;
+  }
+
+  const minTimestamp = Math.min(...packets.map(packet => packet.timestamp));
+  if (minTimestamp >= 0) {
+    return packets;
+  }
+
+  return packets
+    .map(packet => packet.clone({timestamp: packet.timestamp - minTimestamp}))
+    .filter(packet => packet.timestamp + packet.duration > 0);
+};
+
 const loadAudioPackets = async (
   uri: string,
 ): Promise<LoadedAudioForMux | null> => {
@@ -312,7 +333,8 @@ export const exportVideoMp4 = async ({
       const audioMeta: EncodedAudioChunkMetadata = {
         decoderConfig: audioData.decoderConfig,
       };
-      for (const packet of audioData.packets) {
+      const muxPackets = normalizeAudioPacketsForMux(audioData.packets);
+      for (const packet of muxPackets) {
         await audioSource.add(packet, audioMeta);
       }
       audioSource.close();
