@@ -1,5 +1,6 @@
 import {appStore} from '@/store/appStore';
 import {computeMediaFitLayout} from '@/features/post/helpers/adjust/mediaFitLayout';
+import {computeAspectType} from '@/features/post/hooks/canvas/useVerifiedMediaFiles';
 import {useElementSize} from '@/features/post/hooks/canvas/useElementSize';
 import type {ExportMode} from '@/features/post/types/exportTypes';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
@@ -34,6 +35,7 @@ export const useAdjustPreviewLayout = (
       activeFile.width,
       activeFile.height,
       exportMode,
+      computeAspectType(activeFile.width, activeFile.height),
     );
   }, [activeFile, layoutSize, exportMode]);
 

@@ -17,6 +17,7 @@ import {
 import {defaultEditor} from '@/store/editorSlice';
 import {defaultAdjustTransform} from '@/store/adjustSlice';
 import {computeMediaFitLayout} from '@/features/post/helpers/adjust/mediaFitLayout';
+import {computeAspectType} from '@/features/post/hooks/canvas/useVerifiedMediaFiles';
 import type {ExportMode} from '@/shared/types/exportMode';
 
 type Props = {
@@ -1113,12 +1114,12 @@ const FilteredMediaInner = (props: Props): React.JSX.Element => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Prefer MediaCanvas-measured container (parity with AdjustMenu); fall back to R3F size.
-  const containerPixelW = Math.max(
+  // Same layout box as AdjustMenu (canvasSize from MediaCanvas) — one source for fit + world units.
+  const layoutW = Math.max(
     1,
     canvasSize.width > 0 ? canvasSize.width : size.width,
   );
-  const containerPixelH = Math.max(
+  const layoutH = Math.max(
     1,
     canvasSize.height > 0 ? canvasSize.height : size.height,
   );
@@ -1133,7 +1134,7 @@ const FilteredMediaInner = (props: Props): React.JSX.Element => {
             (mediaTextureState as any).image &&
             (mediaTextureState as any).image.width
           ? (mediaTextureState as any).image.width
-          : containerPixelW;
+          : layoutW;
 
   const mediaPixelH =
     props.originalWidth && props.originalHeight
@@ -1144,21 +1145,27 @@ const FilteredMediaInner = (props: Props): React.JSX.Element => {
             (mediaTextureState as any).image &&
             (mediaTextureState as any).image.height
           ? (mediaTextureState as any).image.height
-          : containerPixelH;
+          : layoutH;
 
   const safeMediaPixelW = Math.max(1, mediaPixelW);
   const safeMediaPixelH = Math.max(1, mediaPixelH);
 
-  const worldPerPixel = viewport.width / Math.max(1, size.width);
+  const slideAspectType =
+    props.originalWidth && props.originalHeight
+      ? computeAspectType(props.originalWidth, props.originalHeight)
+      : props.aspectType;
+
+  const worldPerPixel = viewport.width / layoutW;
   const worldW = safeMediaPixelW * worldPerPixel;
   const worldH = safeMediaPixelH * worldPerPixel;
 
   const fitLayout = computeMediaFitLayout(
-    containerPixelW,
-    containerPixelH,
+    layoutW,
+    layoutH,
     safeMediaPixelW,
     safeMediaPixelH,
     props.exportMode,
+    slideAspectType,
   );
   const baseFitScale = fitLayout.baseFitScale;
 

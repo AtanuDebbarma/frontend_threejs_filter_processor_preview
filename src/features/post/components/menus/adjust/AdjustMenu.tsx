@@ -312,10 +312,22 @@ export const AdjustMenu = ({
   };
 
   const handleConfirm = () => {
-    if (activeFile?.width && activeFile?.height) {
+    let mediaW = activeFile?.width ?? 0;
+    let mediaH = activeFile?.height ?? 0;
+    const mediaEl = mediaRef.current;
+    if ((!mediaW || !mediaH) && mediaEl) {
+      if ('videoWidth' in mediaEl && mediaEl.videoWidth > 0) {
+        mediaW = mediaEl.videoWidth;
+        mediaH = mediaEl.videoHeight;
+      } else if ('naturalWidth' in mediaEl && mediaEl.naturalWidth > 0) {
+        mediaW = mediaEl.naturalWidth;
+        mediaH = mediaEl.naturalHeight;
+      }
+    }
+    if (mediaW > 0 && mediaH > 0) {
       setAdjustTransform(activeIndex, currentActiveId, {
-        x: position.x / activeFile.width,
-        y: position.y / activeFile.height,
+        x: position.x / mediaW,
+        y: position.y / mediaH,
         scale,
         rotation,
         bgColor: localBgColor,

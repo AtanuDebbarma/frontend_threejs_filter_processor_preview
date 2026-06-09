@@ -1,4 +1,6 @@
 import type {ExportMode} from '@/shared/types/exportMode';
+import type {AspectType} from '@/features/post/hooks/canvas/useVerifiedMediaFiles';
+import {computeAspectType} from '@/features/post/hooks/canvas/useVerifiedMediaFiles';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
 
 export type MediaFitLayout = {
@@ -7,11 +9,41 @@ export type MediaFitLayout = {
   displayScale: {x: number; y: number};
   displayedWidth: number;
   displayedHeight: number;
+  fitMode: 'contain' | 'cover';
+};
+
+export type MediaFitMode = 'contain' | 'cover';
+
+/**
+ * Default object-fit for a slide — matches FilteredMedia fallback before MediaCanvas passed fit=cover:
+ * post 4:5 → landscape/square contain, vertical cover; reel/story 9:16 → wide contain, tall cover.
+ */
+export const resolveMediaFitMode = (
+  exportMode: ExportMode,
+  mediaWidth: number,
+  mediaHeight: number,
+  containerWidth: number,
+  containerHeight: number,
+  aspectType?: AspectType,
+): MediaFitMode => {
+  const mw = Math.max(1, mediaWidth);
+  const mh = Math.max(1, mediaHeight);
+  const cw = Math.max(1, containerWidth);
+  const ch = Math.max(1, containerHeight);
+  const mediaAspect = mw / mh;
+  const containerAspect = cw / ch;
+
+  if (isPostLayoutMode(exportMode)) {
+    const orientation =
+      aspectType ?? computeAspectType(mediaWidth, mediaHeight);
+    return orientation === 'vertical' ? 'cover' : 'contain';
+  }
+
+  return mediaAspect > containerAspect ? 'contain' : 'cover';
 };
 
 /**
  * Single source of truth for object-fit-style layout in AdjustMenu and FilteredMedia.
- * Post (4:5) uses cover-like fitting for wide media; reel/story (9:16) uses contain-like for wide media.
  */
 export const computeMediaFitLayout = (
   containerWidth: number,
@@ -19,35 +51,22 @@ export const computeMediaFitLayout = (
   mediaWidth: number,
   mediaHeight: number,
   exportMode: ExportMode,
+  aspectType?: AspectType,
 ): MediaFitLayout => {
   const cw = Math.max(1, containerWidth);
   const ch = Math.max(1, containerHeight);
   const mw = Math.max(1, mediaWidth);
   const mh = Math.max(1, mediaHeight);
 
-  const mediaAspect = mw / mh;
-  const containerAspect = cw / ch;
+  const fitMode = resolveMediaFitMode(exportMode, mw, mh, cw, ch, aspectType);
 
-  let displayedWidth: number;
-  let displayedHeight: number;
+  const baseFitScale =
+    fitMode === 'contain'
+      ? Math.min(cw / mw, ch / mh)
+      : Math.max(cw / mw, ch / mh);
 
-  if (isPostLayoutMode(exportMode)) {
-    if (mediaAspect > containerAspect) {
-      displayedHeight = ch;
-      displayedWidth = displayedHeight * mediaAspect;
-    } else {
-      displayedWidth = cw;
-      displayedHeight = displayedWidth / mediaAspect;
-    }
-  } else if (mediaAspect > containerAspect) {
-    displayedWidth = cw;
-    displayedHeight = displayedWidth / mediaAspect;
-  } else {
-    displayedHeight = ch;
-    displayedWidth = displayedHeight * mediaAspect;
-  }
-
-  const baseFitScale = displayedWidth / mw;
+  const displayedWidth = mw * baseFitScale;
+  const displayedHeight = mh * baseFitScale;
 
   return {
     baseFitScale,
@@ -57,5 +76,6 @@ export const computeMediaFitLayout = (
     },
     displayedWidth,
     displayedHeight,
+    fitMode,
   };
 };
