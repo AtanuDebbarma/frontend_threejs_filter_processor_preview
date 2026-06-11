@@ -7,6 +7,7 @@ import {faXmark, faPlus} from '@fortawesome/free-solid-svg-icons';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import type {ExportMode} from '@/features/post/types/exportTypes';
 import {MENU_CHROME_CANVAS_INTERACTIVE_CLASS} from '@/features/post/helpers/menuChrome/menuChromeClasses';
+import {isEditorMenuRoot} from '@/features/post/bridge/helpers/performEditorBack';
 import {scheduleSetActiveButton} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 import {isPostLayoutMode} from '@/features/post/types/exportTypes';
 
@@ -83,8 +84,12 @@ const MediaComponent = ({
     [],
   );
 
-  const handleClose = (e: any) => {
+  const handleClose = (e: React.MouseEvent) => {
     e.preventDefault();
+    const {activeButton} = appStore.getState();
+    if (isEditorMenuRoot(activeButton)) {
+      return;
+    }
     scheduleSetActiveButton(null);
   };
   const handleIconPress = (close: boolean, add: boolean) => {

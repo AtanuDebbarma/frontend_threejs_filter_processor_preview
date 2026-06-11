@@ -6,6 +6,42 @@
 import {appStore} from '@/store/appStore';
 import {PostExportPausedError} from '@/features/post/helpers/postExport/postExportPause';
 
+/** Media processor uploader returns `{ error: "TOO_LARGE" }` (HTTP 400). */
+export class UploadFileTooLargeError extends Error {
+  constructor() {
+    super('UPLOAD_FILE_TOO_LARGE');
+    this.name = 'UploadFileTooLargeError';
+  }
+}
+
+export const isUploadFileTooLargeError = (err: unknown): boolean =>
+  err instanceof UploadFileTooLargeError;
+
+const parseUploaderErrorCode = (responseText: string): string | null => {
+  try {
+    const data = JSON.parse(responseText) as {error?: string};
+    return typeof data.error === 'string' ? data.error : null;
+  } catch {
+    return null;
+  }
+};
+
+const rejectUploadHttpError = (
+  xhr: XMLHttpRequest,
+  reject: (err: Error) => void,
+): void => {
+  const errorCode = parseUploaderErrorCode(xhr.responseText);
+  if (errorCode === 'TOO_LARGE' || xhr.status === 413) {
+    reject(new UploadFileTooLargeError());
+    return;
+  }
+  if (errorCode) {
+    reject(new Error(`Upload failed with status ${xhr.status}: ${errorCode}`));
+    return;
+  }
+  reject(new Error(`Upload failed with status ${xhr.status}`));
+};
+
 export type UploadEncodedMediaParams = {
   endpointUrl: string;
   blob: Blob;
@@ -79,7 +115,7 @@ export const uploadEncodedMediaToEndpoint = async ({
         }
         return;
       }
-      reject(new Error(`Upload failed with status ${xhr.status}`));
+      rejectUploadHttpError(xhr, reject);
     };
 
     xhr.onabort = () => {
