@@ -24,8 +24,9 @@ import {
   postExportProgress,
   postExportSuccess,
   postPostExportFailed,
-  flushPendingExportSuccesses,
-  consumeLastFlushedSuccessIds,
+  clearExportSuccessHandoff,
+  resendUnacknowledgedExportSuccesses,
+  getUploadCompleteExportIds,
 } from '@/features/post/bridge/helpers/postExportRnMessages';
 import {
   resolveExportDimensionsForMode,
@@ -173,10 +174,10 @@ export const runPostExportBatch = async (
   }
 
   pauseAllPreviewVideos();
-  flushPendingExportSuccesses();
-  const flushedSuccessIds = new Set(consumeLastFlushedSuccessIds());
+  resendUnacknowledgedExportSuccesses();
+  const uploadCompleteIds = new Set(getUploadCompleteExportIds());
   const batchItems = postExportItems.filter(
-    item => !flushedSuccessIds.has(item.id),
+    item => !uploadCompleteIds.has(item.id),
   );
   const detachPostExportPauseListener = attachPostExportPauseListener();
 
@@ -261,7 +262,7 @@ export const runPostExportBatch = async (
           fileIndex: index,
           fileCount,
         });
-        flushPendingExportSuccesses();
+        resendUnacknowledgedExportSuccesses();
 
         if (isPostExportPauseRequested()) {
           rnLogger.log('📤 Post export paused after file success');
@@ -317,6 +318,7 @@ export const runPostExportBatch = async (
     appStore.getState().setIsPostExporting(false);
     if (!wasCancelled) {
       appStore.getState().resetPostExport();
+      clearExportSuccessHandoff();
     } else {
       appStore.getState().setPostExportConfig(0, []);
     }

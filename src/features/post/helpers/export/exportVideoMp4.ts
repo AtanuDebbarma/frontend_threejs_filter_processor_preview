@@ -27,6 +27,7 @@ import {
 import {getExportCanvas} from '@/features/post/helpers/canvas/exportCanvasRegistry';
 import {
   DEFAULT_SAVE_CHUNK_BYTES,
+  VIDEO_EXPORT_BITRATE,
   VIDEO_EXPORT_FPS,
 } from '@/features/post/types/exportTypes';
 import {blitCanvasToExportSize} from './exportBlit';
@@ -177,7 +178,7 @@ export const exportVideoMp4 = async ({
   const videoCodec = await getFirstEncodableVideoCodec(['avc'], {
     width,
     height,
-    bitrate: 4_000_000,
+    bitrate: VIDEO_EXPORT_BITRATE,
   });
   assertSaveExport(
     videoCodec,
@@ -251,14 +252,15 @@ export const exportVideoMp4 = async ({
 
   const output = new Output({
     format: new Mp4OutputFormat({
-      fastStart: streamHandoff ? 'fragmented' : false,
+      // Post S3 uploads use BufferTarget — moov at front for progressive playback.
+      fastStart: streamHandoff ? 'fragmented' : 'in-memory',
     }),
     target,
   });
 
   const videoSource = new CanvasSource(frameCanvas, {
     codec: videoCodec,
-    bitrate: 4_000_000,
+    bitrate: VIDEO_EXPORT_BITRATE,
     keyFrameInterval: 2,
   });
   output.addVideoTrack(videoSource, {frameRate: VIDEO_EXPORT_FPS});

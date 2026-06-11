@@ -17,7 +17,11 @@ import {
   isStartPostExportPayload,
   requestCancelPostExport,
 } from '@/features/post/bridge/helpers/postBridge';
-import {postPostExportFailed} from '@/features/post/bridge/helpers/postExportRnMessages';
+import {
+  ackExportSuccessFromRn,
+  postPostExportFailed,
+  syncExportSuccessHandoff,
+} from '@/features/post/bridge/helpers/postExportRnMessages';
 import {performEditorBack} from '@/features/post/bridge/helpers/performEditorBack';
 
 type UsePostRnDocumentHandlerParams = {
@@ -95,6 +99,35 @@ export function usePostRnDocumentHandler({
           case 'CANCEL_POST_EXPORT': {
             rnLogger.log('📥 CANCEL_POST_EXPORT — pausing batch between files');
             requestCancelPostExport();
+            break;
+          }
+
+          case 'SYNC_EXPORT_STATE': {
+            const receivedIds = (msg.payload as {receivedIds?: unknown})
+              ?.receivedIds;
+            if (Array.isArray(receivedIds)) {
+              const ids = receivedIds.filter(
+                (id): id is string => typeof id === 'string' && id.length > 0,
+              );
+              const resent = syncExportSuccessHandoff(ids);
+              rnLogger.log('📥 SYNC_EXPORT_STATE', {
+                receivedCount: ids.length,
+                resentCount: resent.length,
+              });
+            } else {
+              rnLogger.warn('SYNC_EXPORT_STATE: invalid payload', msg.payload);
+            }
+            break;
+          }
+
+          case 'EXPORT_SUCCESS_ACK': {
+            const id = (msg.payload as {id?: unknown})?.id;
+            if (typeof id === 'string' && id.length > 0) {
+              ackExportSuccessFromRn(id);
+              rnLogger.log('📥 EXPORT_SUCCESS_ACK', {id});
+            } else {
+              rnLogger.warn('EXPORT_SUCCESS_ACK: invalid payload', msg.payload);
+            }
             break;
           }
 

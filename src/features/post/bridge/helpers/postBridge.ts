@@ -5,7 +5,8 @@ import type {
   StartPostExportPayload,
 } from '@/features/post/types/exportTypes';
 import {
-  flushPendingExportSuccesses,
+  clearExportSuccessHandoff,
+  resendUnacknowledgedExportSuccesses,
   postPostExportAck,
 } from '@/features/post/bridge/helpers/postExportRnMessages';
 import {abortActivePostUpload} from '@/features/post/helpers/export/uploadExport';
@@ -24,10 +25,13 @@ export const handleStartOrResumePostExport = (
 ): void => {
   const {fileCount, items} = payload;
   rnLogger.log(`📥 ${source} received`, {fileCount, items});
+  if (source === 'START_POST_EXPORT') {
+    clearExportSuccessHandoff();
+  }
   appStore.getState().setPostExportConfig(fileCount, items);
   appStore.getState().setIsPostExporting(true);
   appStore.getState().setPostExportCancelRequested(false);
-  flushPendingExportSuccesses();
+  resendUnacknowledgedExportSuccesses();
   postPostExportAck({fileCount});
   void runPostExportBatch(exportMode).catch(batchErr => {
     rnLogger.componentLog(
