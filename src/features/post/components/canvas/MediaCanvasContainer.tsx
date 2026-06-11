@@ -18,6 +18,7 @@ import {
 import {trimBase64} from '@/features/post/helpers/canvas/other_helpers';
 import {MediaCanvas} from './MediaCanvas';
 import type {ExportMode} from '@/features/post/types/exportTypes';
+import {isEditorMenuRoot} from '@/features/post/bridge/helpers/performEditorBack';
 import {scheduleSetTagMode} from '@/features/post/helpers/menuChrome/menuChromeNavigation';
 import {
   pauseAllPreviewVideos,
@@ -36,7 +37,11 @@ export const MediaCanvasContainer = ({
   const activeButton = appStore(state => state.activeButton);
   const storeActiveIndex = appStore(state => state.activeIndex);
   const setActiveIndex = appStore(state => state.setActiveIndex);
-  const buttonsOpen = useMemo(() => activeButton !== null, [activeButton]);
+  /** Default BottomBar (`mainMenu` / `null`) still allows canvas play/pause. */
+  const subMenuBlocksCanvasPlay = useMemo(
+    () => !isEditorMenuRoot(activeButton),
+    [activeButton],
+  );
   const tagMode = appStore(state => state.tagMode);
   const setTagMode = appStore(state => state.setTagMode);
   const overlayPausesVideo = useMemo(
@@ -196,7 +201,7 @@ export const MediaCanvasContainer = ({
   // called when canvas/mesh is tapped (from FilteredMedia)
   const handleTap = useCallback(
     (index: number) => {
-      if (buttonsOpen) return;
+      if (subMenuBlocksCanvasPlay) return;
       void togglePlayForIndex(index);
 
       // show per-index button (existing logic)
@@ -214,7 +219,7 @@ export const MediaCanvasContainer = ({
         hideTimeouts.current[index] = null;
       }, 1000);
     },
-    [togglePlayForIndex, buttonsOpen],
+    [togglePlayForIndex, subMenuBlocksCanvasPlay],
   );
 
   // Hide playerIconTapped after delay (like RN code)
