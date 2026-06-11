@@ -4,7 +4,7 @@ import type {ExportMode} from '@/shared/types/exportMode';
 
 export type ExportDestination = 'gallery' | 's3';
 
-/** Full-quality export — images, single-video Save, Post when one video (4:5 / 9:16). */
+/** Full-quality still export — photos always use these (4:5 / 9:16). */
 export const EXPORT_DIMENSIONS_FULL: Record<
   ExportMode,
   {width: number; height: number}
@@ -14,11 +14,18 @@ export const EXPORT_DIMENSIONS_FULL: Record<
   story: {width: 1080, height: 1920},
 };
 
-/**
- * Lower resolution for multi-video batch (RAM / encode time).
- * ~+23% pixels vs legacy 864-wide targets; images always use EXPORT_DIMENSIONS_FULL.
- */
-export const EXPORT_DIMENSIONS_BATCH: Record<
+/** Single-video WebCodecs encode targets. */
+export const EXPORT_DIMENSIONS_VIDEO_SINGLE: Record<
+  ExportMode,
+  {width: number; height: number}
+> = {
+  post: {width: 1000, height: 1250},
+  reel: {width: 1080, height: 1920},
+  story: {width: 1080, height: 1920},
+};
+
+/** Multi-video batch encode (RAM / encode time). */
+export const EXPORT_DIMENSIONS_VIDEO_BATCH: Record<
   ExportMode,
   {width: number; height: number}
 > = {
@@ -27,13 +34,18 @@ export const EXPORT_DIMENSIONS_BATCH: Record<
   story: {width: 960, height: 1712},
 };
 
+/** @deprecated Use EXPORT_DIMENSIONS_VIDEO_BATCH. */
+export const EXPORT_DIMENSIONS_BATCH = EXPORT_DIMENSIONS_VIDEO_BATCH;
+
 /** 4:5 carousel / post layout (vs 9:16 reel/story). */
 export const isPostLayoutMode = (mode: ExportMode): boolean => mode === 'post';
 
 /** @deprecated Use resolveExportDimensions — kept as alias for full post size. */
 export const TARGET_DIMENSIONS = EXPORT_DIMENSIONS_FULL;
 
-/** WebCodecs video encode — unchanged when bumping still frame size. */
+/** WebCodecs video encode — all carousel videos use this bitrate. */
+export const VIDEO_EXPORT_BITRATE = 4_800_000;
+
 export const VIDEO_EXPORT_FPS = 30;
 
 export const resolveExportDimensions = (
@@ -41,10 +53,13 @@ export const resolveExportDimensions = (
   mediaType: 'photo' | 'video',
   videoCountInFiles: number,
 ): {width: number; height: number} => {
-  const useBatchVideo = mediaType === 'video' && videoCountInFiles > 1;
-  return useBatchVideo
-    ? EXPORT_DIMENSIONS_BATCH[mode]
-    : EXPORT_DIMENSIONS_FULL[mode];
+  if (mediaType === 'photo') {
+    return EXPORT_DIMENSIONS_FULL[mode];
+  }
+  if (videoCountInFiles > 1) {
+    return EXPORT_DIMENSIONS_VIDEO_BATCH[mode];
+  }
+  return EXPORT_DIMENSIONS_VIDEO_SINGLE[mode];
 };
 
 /** Uses hydration `exportMode` for batch/full dimension tables. */
@@ -161,4 +176,15 @@ export type PostExportFailedPayload = {
 
 export type PostExportAckPayload = {
   fileCount: number;
+};
+
+/** RN → Web: attachment ids RN already recorded from EXPORT_SUCCESS. */
+export type SyncExportStatePayload = {
+  receivedIds: string[];
+};
+
+/** RN → Web: RN finished handling EXPORT_SUCCESS for one file. */
+export type ExportSuccessAckPayload = {
+  id: string;
+  index: number;
 };

@@ -61,7 +61,7 @@ Hydration sends `exportMode: 'post' | 'reel' | 'story'` (replaces legacy `post: 
 | `post` | `cover` | 4:5 | 1080×1350 | **Shipped** — `PostEditor` |
 | `reel` / `story` | `contain` | 9:16 | 1080×1920 | Hydration + export types supported; shell shows loader until a dedicated editor is added |
 
-Multi-**video** post batch uses lower encode targets (RAM): **960×1200** (post) / **960×1712** (9:16). See `src/features/post/types/exportTypes.ts`.
+Post **video** encode: **1000×1250** (1 video) / **960×1200** (2+ videos) @ **4.8 Mbps**; photos stay **1080×1350**. Reel/story batch: **960×1712**. See `src/features/post/types/exportTypes.ts`.
 
 Invalid `exportMode` in hydration logs a warning and defaults to `'post'`.
 
