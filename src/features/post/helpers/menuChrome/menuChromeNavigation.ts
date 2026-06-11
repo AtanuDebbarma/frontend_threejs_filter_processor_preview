@@ -123,9 +123,25 @@ export function scheduleMenuChromeNavigation(
 const shouldPausePreviewForButton = (button: ButtonStateType): boolean =>
   button === 'adjust' || (button !== null && TEXT_FLOW_BUTTONS.has(button));
 
+/** Both states render the default BottomBar — no footer chrome swap. */
+const isFooterRootButton = (button: ButtonStateType): boolean =>
+  button === 'mainMenu' || button === null;
+
 export function scheduleSetActiveButton(button: ButtonStateType): void {
   const state = appStore.getState();
-  const kind = resolveMenuChromeKindForButton(state.activeButton, button);
+  const {activeButton} = state;
+
+  if (activeButton === button) {
+    return;
+  }
+
+  // mainMenu ↔ null only changes store bookkeeping; same BottomBar stays mounted.
+  if (isFooterRootButton(activeButton) && isFooterRootButton(button)) {
+    state.setActiveButton(button);
+    return;
+  }
+
+  const kind = resolveMenuChromeKindForButton(activeButton, button);
   if (shouldPausePreviewForButton(button)) {
     pauseAllPreviewVideos();
   }

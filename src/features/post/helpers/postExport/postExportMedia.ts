@@ -34,6 +34,7 @@ import {
 } from '@/features/post/types/exportTypes';
 import {
   abortActivePostUpload,
+  isUploadFileTooLargeError,
   uploadEncodedMediaToEndpoint,
 } from '@/features/post/helpers/export/uploadExport';
 import {isPostExportPausedError} from '@/features/post/helpers/postExport/postExportPause';
@@ -276,8 +277,12 @@ export const runPostExportBatch = async (
           });
           break;
         }
-        const message =
-          fileErr instanceof Error ? fileErr.message : 'Post export failed';
+        const tooLarge = isUploadFileTooLargeError(fileErr);
+        const message = tooLarge
+          ? 'FILE_TOO_LARGE'
+          : fileErr instanceof Error
+            ? fileErr.message
+            : 'Post export failed';
         const technical =
           fileErr instanceof Error
             ? `${fileErr.name}: ${fileErr.message}`
