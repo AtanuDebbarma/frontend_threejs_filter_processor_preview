@@ -1,6 +1,6 @@
 # Mobeet Create Post Media Editor
 
-Production **WebView bundle** for the Mobeet create-post flow (`mbt/`). It renders GPU filter preview (Three.js / R3F), runs in-WebView export (WebCodecs + canvas), and talks to React Native over `postMessage`.
+Production **WebView bundle** for the Mobeet create-post flow (`Mobeet-RN-Frontend/`). It renders GPU filter preview (Three.js / R3F), runs in-WebView export (WebCodecs + canvas), and talks to React Native over `postMessage`.
 
 This package is **not** a standalone app. It ships as a single **`index.html`** (Vite + `vite-plugin-singlefile`), delivered OTA and loaded from disk in the WebView — not embedded in the APK/IPA.
 
@@ -323,9 +323,9 @@ Optional: **`bunx fallow`** (or add a script) for duplication / circular depende
 ## Contributing & license
 
 1. Branch from your team integration branch.
-2. Coordinate **protocol and hydration** changes with **`mbt/`**.
+2. Coordinate **protocol and hydration** changes with **`Mobeet-RN-Frontend/`**.
 3. Run **`bun run tsc`** and **`bun run lint`** before opening a PR.
-4. Update **`mbt/docs/createPost/`** when message contracts change.
+4. Update **`Mobeet-RN-Frontend/docs/createPost/`** when message contracts change.
 5. Update **this README** when you add export modes, move bridge code, or change folder conventions.
 
 **License:** Mobeet Technologies Private Limited — Proprietary. See [LICENSE](./LICENSE). Licensing: **mobeetdotcom@gmail.com**
