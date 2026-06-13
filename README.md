@@ -7,8 +7,8 @@ This package is **not** a standalone app. It ships as a single **`index.html`** 
 | | |
 | --- | --- |
 | **Folder name** | `frontend_threejs_filter_processor_preview` (historical) |
-| **RN host** | `mbt/app/features/createPost/` → `MediaProcessorMain` |
-| **Deep docs** | [`../mbt/docs/createPost/CreatePostMediaFilterPipeline.md`](../mbt/docs/createPost/CreatePostMediaFilterPipeline.md), [`../mbt/docs/createPost/CreatePost_MediaEditor_Tasks.md`](../mbt/docs/createPost/CreatePost_MediaEditor_Tasks.md) |
+| **RN host** | `Mobeet-RN-Frontend/app/features/createPost/` → `MediaProcessorMain` |
+| **Deep docs** | [`Mobeet-RN-Frontend/docs/createPost/CreatePost_Architecture.md`](https://github.com/Mobeet-com/Mobeet-RN-Frontend/tree/develop/docs/createPost)
 
 ## Table of contents
 
@@ -43,14 +43,14 @@ This package is **not** a standalone app. It ships as a single **`index.html`** 
 ## How it reaches the phone
 
 ```text
-mbt/ (Expo)
+Mobeet-RN-Frontend/ (Expo)
   create-post → MediaProcessorMain
     ├── editorUpdater     OTA: manifest.json → cache index.html → file:// WebView
     ├── mediaServer       localhost HTTP → media URIs in hydration (no base64 in payload)
     └── WebView           loads cached editor HTML
 ```
 
-When you change hydration shape, `postMessage` types, or export contracts, update **this repo and `mbt/`** in the same change set (`webViewHelpers.ts`, `webViewTypes.ts`, bridge handlers).
+When you change hydration shape, `postMessage` types, or export contracts, update **this repo and `Mobeet-RN-Frontend/`** in the same change set (`webViewHelpers.ts`, `webViewTypes.ts`, bridge handlers).
 
 ## Layout modes (`exportMode`)
 
@@ -145,7 +145,7 @@ scripts/
 
 ## RN ↔ Web protocol
 
-**Authoritative lists:** `mbt/docs/createPost/CreatePost_MediaEditor_Tasks.md`, `mbt/app/features/createPost/types/webViewTypes.ts`.
+**Authoritative lists:** `Mobeet-RN-Frontend/docs/createPost/CreatePost_Architecture.md`, `Mobeet-RN-Frontend/app/features/createPost/types/webViewTypes.ts`.
 
 **Contract unchanged** after the folder restructure — only file paths moved.
 
@@ -245,7 +245,7 @@ bun run lint         # eslint
 bun run build        # dist/index.html + manifest.json
 ```
 
-**Real integration testing** needs the **mbt** dev client: OTA or local `docs/`, `mediaServer`, and WebView `postMessage`.
+**Real integration testing** needs the **Mobeet-RN-Frontend** dev client: OTA or local `docs/`, `mediaServer`, and WebView `postMessage`.
 
 **Browser-only smoke test (optional):** wire `useDevMockHydration` in `App.tsx` with a local video asset and `HydrationPayload`, or uncomment the inline `DEV_MOCK_HYDRATION` block. Default checkout leaves mock hydration **off** so the shell stays on the loader until RN hydrates (matches production).
 
@@ -253,7 +253,7 @@ bun run build        # dist/index.html + manifest.json
 
 Build locally; deploy **`docs/`** (static). Recommended: **Vercel** — see [`docs/VERCEL_FIREWALL_SETUP.md`](docs/VERCEL_FIREWALL_SETUP.md).
 
-**`mbt/.env` (example):**
+**`Mobeet-RN-Frontend/.env` (example):**
 
 ```env
 EXPO_PUBLIC_EDITOR_MANIFEST_URL=https://your-project.vercel.app/manifest.json
