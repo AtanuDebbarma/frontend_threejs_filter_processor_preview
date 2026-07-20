@@ -22,11 +22,7 @@ export const canAddTextLayer = (
   slide.layers.length < MAX_TEXT_LAYERS_PER_SLIDE;
 
 export type TextBackgroundStyle =
-  | 'pill'
-  | 'box'
-  | 'square'
-  | 'rounded'
-  | 'outlined';
+  'pill' | 'box' | 'square' | 'rounded' | 'outlined';
 
 export type TextAlign = 'center' | 'left' | 'right';
 

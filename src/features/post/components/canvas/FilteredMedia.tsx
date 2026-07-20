@@ -540,11 +540,9 @@ const FilteredMediaInner = (props: Props): React.JSX.Element => {
 
     if (mediaTextureState instanceof THREE.VideoTexture) {
       const videoElem = (mediaTextureState as any).__videoElement as
-        | HTMLVideoElement
-        | undefined;
+        HTMLVideoElement | undefined;
       const videoReady = (mediaTextureState as any).__videoReady as
-        | {current: boolean}
-        | undefined;
+        {current: boolean} | undefined;
 
       if (!videoElem || !videoReady?.current) {
         return;
@@ -854,8 +852,7 @@ const FilteredMediaInner = (props: Props): React.JSX.Element => {
     const mat: any = materialRef.current;
     if (!mat) return;
     const textureImage = mediaTextureState?.image as
-      | {width?: number; height?: number}
-      | undefined;
+      {width?: number; height?: number} | undefined;
     const w =
       props.originalWidth ??
       videoElRef.current?.videoWidth ??
@@ -1049,8 +1046,7 @@ const FilteredMediaInner = (props: Props): React.JSX.Element => {
       if (mediaTextureState) {
         if (mediaTextureState instanceof THREE.VideoTexture) {
           const vid = (mediaTextureState as any).__videoElement as
-            | HTMLVideoElement
-            | undefined;
+            HTMLVideoElement | undefined;
           if (vid) {
             try {
               vid.pause();

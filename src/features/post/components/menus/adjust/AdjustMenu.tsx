@@ -20,6 +20,7 @@ import {
   cancelMenuChromeNavigation,
   scheduleSetActiveButton,
 } from '@/features/post/helpers/menuChrome/menuChromeNavigation';
+import {formatMediaTagUsername} from '@/features/post/helpers/adjust/formatMediaTagUsername';
 
 type Props = {
   exportMode: ExportMode;
@@ -479,7 +480,7 @@ export const AdjustMenu = ({
                 pointerEvents: 'auto',
               }}>
               <span className="mr-1 max-w-25 min-w-7.5 truncate overflow-hidden font-medium text-ellipsis whitespace-nowrap">
-                {tag.username ? `${tag.username}` : ''}
+                {tag.username ? formatMediaTagUsername(tag.username) : ''}
               </span>
               <button
                 onClick={e => {

@@ -14,11 +14,7 @@ type Props = {
 };
 
 type BackgroundMode =
-  | 'defaultPill'
-  | 'none'
-  | 'square'
-  | 'rounded'
-  | 'outlined';
+  'defaultPill' | 'none' | 'square' | 'rounded' | 'outlined';
 
 const MODE_BUTTONS: Array<{id: BackgroundMode; label: string}> = [
   {id: 'defaultPill', label: 'Classic'},
