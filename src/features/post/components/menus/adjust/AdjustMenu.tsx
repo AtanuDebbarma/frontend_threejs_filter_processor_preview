@@ -470,7 +470,7 @@ export const AdjustMenu = ({
           tagValuesByIndex[activeIndex].tags?.map(tag => (
             <div
               key={tag.id}
-              className="absolute flex items-center rounded-full bg-black/60 px-3 py-2 text-sm text-white shadow-md backdrop-blur-sm transition-all duration-200 ease-in-out hover:bg-black/90"
+              className="absolute flex items-center rounded-full bg-[rgba(55,55,55,0.8)] px-3 py-1.5 text-sm text-white shadow-md backdrop-blur-sm transition-all duration-200 ease-in-out hover:bg-[rgba(55,55,55,0.95)]"
               style={{
                 left: `${tag.x * 100}%`,
                 top: `${tag.y * 100}%`,
